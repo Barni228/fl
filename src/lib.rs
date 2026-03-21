@@ -1,5 +1,6 @@
 use filelist::FileList;
 use std::{
+    cmp::{max, min},
     collections::HashMap,
     path::{Path, PathBuf},
 };
@@ -11,7 +12,7 @@ pub struct FL {
     /// path to directory containing `.fl` folder
     root: PathBuf,
     /// number of commits, last commit is `commits - 1`
-    commits: u32,
+    commits: i32,
 }
 
 // Constructors
@@ -52,8 +53,8 @@ impl FL {
     /// # Arguments
     /// * `root` - Directory where the repository should be created.
     pub fn create_fl_repo(root: PathBuf) -> Self {
-        fs_helper::mkdir(root.join(".fl"));
-        fs_helper::mkdir(root.join(".fl/history"));
+        fs_helper::create_dir(root.join(".fl"));
+        fs_helper::create_dir(root.join(".fl").join("history"));
 
         FL::new(root)
     }
@@ -62,7 +63,7 @@ impl FL {
     ///
     /// This is a convenience wrapper around [`FL::create_fl_repo`].
     pub fn init() -> Self {
-        FL::create_fl_repo(fs_helper::get_current_dir())
+        FL::create_fl_repo(fs_helper::current_dir())
     }
 }
 
@@ -95,7 +96,7 @@ impl FL {
             .max()
             .map_or(0, |n| n + 1);
 
-        self.commits = commits;
+        self.commits = commits as i32;
     }
 
     /// Creates a new snapshot of the current state of the repository.
@@ -106,7 +107,7 @@ impl FL {
     /// # Panics
     /// Panics if file listing fails.
     pub fn update(&mut self) {
-        let out_path = self.history_file_path(self.commits as i32);
+        let out_path = self.history_file_path(self.commits);
         let mut fl = self.get_filelist();
         // fl.set_output(Some(root.join(".fl/STAGE")));
         fl.set_output(Some(out_path));
@@ -127,7 +128,15 @@ impl FL {
     /// * `D` - Deleted file
     /// * `M` - Modified file
     /// * `R` - Renamed/moved file
-    pub fn diff_history(&self, first: i32, second: i32) {
+    pub fn diff_history(&self, a: i32, b: i32) {
+        let valid_a = self.to_valid_history_index(a);
+        let valid_b = self.to_valid_history_index(b);
+
+        // always compare older commit to newer commit
+        let first = min(valid_a, valid_b);
+        let second = max(valid_a, valid_b);
+
+        println!("Diffing {first} and {second}");
         FL::diff_paths(
             &self.history_file_path(first),
             &self.history_file_path(second),
@@ -138,8 +147,8 @@ impl FL {
 // private methods
 impl FL {
     fn diff_paths(first: &Path, second: &Path) {
-        let content1 = fs_helper::read_file(first);
-        let content2 = fs_helper::read_file(second);
+        let content1 = fs_helper::read_to_string(first);
+        let content2 = fs_helper::read_to_string(second);
 
         let old_by_path: HashMap<&str, &str> = fs_helper::parse_filelist(&content1);
         let new_by_path: HashMap<&str, &str> = fs_helper::parse_filelist(&content2);
@@ -179,11 +188,35 @@ impl FL {
         self.root.join(".fl").join("history")
     }
 
+    /// returns the path to a history file based on its index
+    /// This does not check if the file exists, it just converts a number to a path
+    /// To get a valid path, use `to_valid_history_index`
     fn history_file_path(&self, index: i32) -> PathBuf {
         self.root
             .join(".fl")
             .join("history")
             .join(format!("{index:08}"))
+    }
+
+    /// returns a valid commit index
+    /// This will always return a positive number
+    ///
+    /// # Panics
+    /// Panics if index is out of bounds
+    fn to_valid_history_index(&self, index: i32) -> i32 {
+        match index {
+            n if 0 <= n && n < self.commits => index,
+            n if -self.commits <= n && n < 0 => self.commits + n,
+            _ => {
+                eprintln!(
+                    "fatal: Invalid commit index: {} (must be between {} and {})",
+                    index,
+                    -self.commits,
+                    self.commits - 1
+                );
+                std::process::exit(2);
+            }
+        }
     }
 
     /// returns a pre-configured filelist for this repo

@@ -4,6 +4,10 @@
 - [ ] maybe store history paths in hex numbers instead of regular numbers (`{:08x}`)
 - [ ] Add something like `check`, that checks if everything is alright
       so it will print warnings if some file hashes are `ERROR: ...`, or if fl repo is broken
+- [ ] Add tests
+- [ ] Improve Error handling, so I return `Result` instead of always exiting with error
+- [ ] Add meaningful exit codes (instead of using raw_os_error)
+- [ ] When diffing, print everything sorted by the file path
 
 ## Done
 

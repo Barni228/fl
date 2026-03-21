@@ -11,10 +11,11 @@ fn main() {
         Some(("update", _)) => {
             FL::in_current_dir().update();
         }
+        // TODO: when I implement the STAGE file, by default compare -1 to STAGE instead of -2
         Some(("diff", sub)) => {
             let first = *sub.get_one::<i32>("FIRST").unwrap();
-            let second = *sub.get_one::<i32>("SECOND").unwrap();
-            println!("Diffing {} and {}", first, second);
+            let second = *sub.get_one::<i32>("SECOND").unwrap_or(&-2);
+            // println!("Diffing {} and {}", first, second);
             FL::in_current_dir().diff_history(first, second);
         }
         Some(("commit", _)) => {

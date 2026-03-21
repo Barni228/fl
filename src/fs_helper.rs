@@ -1,4 +1,4 @@
-//! [`std::fs`] functions, but instead of returning [`std::io::Result`] exits with nice errors
+//! [`std::fs`] functions, but instead of returning [`std::io::Result`] it exits with nice errors
 
 use std::collections::HashMap;
 use std::{
@@ -17,7 +17,7 @@ pub fn parse_filelist(content: &str) -> HashMap<&str, &str> {
     map
 }
 
-pub fn read_file(path: impl AsRef<Path>) -> String {
+pub fn read_to_string(path: impl AsRef<Path>) -> String {
     match fs::read_to_string(&path) {
         Ok(s) => s,
         Err(e) => {
@@ -31,7 +31,7 @@ pub fn read_file(path: impl AsRef<Path>) -> String {
 }
 
 pub fn find_root_path() -> PathBuf {
-    let mut dir = get_current_dir();
+    let mut dir = current_dir();
 
     loop {
         let candidate = dir.join(".fl");
@@ -47,7 +47,7 @@ pub fn find_root_path() -> PathBuf {
     }
 }
 
-pub fn mkdir(path: impl AsRef<Path>) {
+pub fn create_dir(path: impl AsRef<Path>) {
     match fs::create_dir(&path) {
         Ok(_) => println!("Created '{}' directory", path.as_ref().display()),
         Err(e) => {
@@ -74,7 +74,7 @@ pub fn read_dir(path: impl AsRef<Path>) -> fs::ReadDir {
     }
 }
 
-pub fn get_current_dir() -> PathBuf {
+pub fn current_dir() -> PathBuf {
     let path = std::env::current_dir();
     match path {
         Ok(p) => p,
