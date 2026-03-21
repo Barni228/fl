@@ -1,11 +1,68 @@
+use colored::Colorize;
 use filelist::FileList;
 use std::{
     cmp::{max, min},
     collections::HashMap,
+    fmt,
     path::{Path, PathBuf},
 };
 
 mod fs_helper;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum Action<'a> {
+    Add(&'a str),
+    Remove(&'a str),
+    Rename(&'a str, &'a str),
+    Modify(&'a str),
+}
+
+impl<'a> Action<'a> {
+    fn colored(&self) -> String {
+        match self {
+            Action::Add(path) => format!("{}  {path}", "A".green()),
+            Action::Remove(path) => format!("{}  {path}", "D".red()),
+            Action::Modify(path) => format!("{}  {path}", "M".yellow()),
+            Action::Rename(from, to) => {
+                format!(r#"{}  "{}" -> "{}""#, "R".magenta(), from.red(), to)
+            }
+        }
+    }
+
+    fn sort_key(&self) -> (&str, u8) {
+        match self {
+            Action::Add(p) => (p, 0),
+            Action::Remove(p) => (p, 1),
+            Action::Modify(p) => (p, 2),
+            Action::Rename(_, to) => (to, 3),
+        }
+    }
+}
+
+impl<'a> fmt::Display for Action<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Action::Add(path) => write!(f, "A  {path}"),
+            Action::Remove(path) => write!(f, "D  {path}"),
+            Action::Modify(path) => write!(f, "M  {path}"),
+            Action::Rename(from, to) => {
+                write!(f, r#"R  "{from}" -> "{to}""#)
+            }
+        }
+    }
+}
+
+impl<'a> PartialOrd for Action<'a> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl<'a> Ord for Action<'a> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.sort_key().cmp(&other.sort_key())
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FL {
@@ -154,11 +211,12 @@ impl FL {
         let new_by_path: HashMap<&str, &str> = fs_helper::parse_filelist(&content2);
         let mut deleted_by_hash: HashMap<&str, Vec<&str>> = HashMap::new();
 
+        let mut actions = Vec::new();
         // detect deletions and modifications
         for (path, old_hash) in &old_by_path {
             match new_by_path.get(path) {
                 None => deleted_by_hash.entry(old_hash).or_default().push(path),
-                Some(new_hash) if new_hash != old_hash => println!("M  {path}"),
+                Some(new_hash) if new_hash != old_hash => actions.push(Action::Modify(path)),
                 _ => {}
             }
         }
@@ -172,15 +230,22 @@ impl FL {
             } else if let Some(deleted_paths) = deleted_by_hash.get_mut(new_hash)
                 && let Some(deleted_path) = deleted_paths.pop()
             {
-                println!(r#"R  "{deleted_path}" -> "{path}""#);
+                actions.push(Action::Rename(deleted_path, path));
+            // otherwise it is just a new file
             } else {
-                println!("A  {path}");
+                actions.push(Action::Add(path));
             }
         }
         for paths in deleted_by_hash.values() {
             for path in paths {
-                println!("D  {path}");
+                actions.push(Action::Remove(path));
             }
+        }
+
+        // sort all the actions by path
+        actions.sort();
+        for action in actions {
+            println!("{}", action.colored());
         }
     }
 

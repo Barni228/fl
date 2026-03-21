@@ -7,9 +7,11 @@
 - [ ] Add tests
 - [ ] Improve Error handling, so I return `Result` instead of always exiting with error
 - [ ] Add meaningful exit codes (instead of using raw_os_error)
-- [ ] When diffing, print everything sorted by the file path
+- [ ] When there are 2 same files (same hash), if u delete one and rename the other,
+      it should somehow nicely know which one got renamed and which one got deleted (right now it randomly chooses one)
 
 ## Done
 
+- [x] When diffing, print everything sorted by the file path
 - [x] Print what changed in git like way (A added.rs, R deleted.rs, M edited.rs)
 - [x] store history changes in a relative way (not absolute, so when i move root folder nothing breaks)
