@@ -250,7 +250,7 @@ impl FL {
         // Because real-world rename groups are tiny (almost always 1-to-1, rarely
         // more than a handful), we use brute-force permutation search which is
         // exact and fast enough in practice.
-        for (hash, new_paths) in &rename_candidates {
+        for (hash, mut new_paths) in rename_candidates {
             // unwrap: key is guaranteed to exist because we only inserted into
             // rename_candidates when deleted_by_hash contained the same hash.
             let deleted_paths = deleted_by_hash.get_mut(hash).unwrap();
@@ -259,10 +259,15 @@ impl FL {
             if new_paths.len() > RENAME_GROUP_SIZE_LIMIT
                 || deleted_paths.len() > RENAME_GROUP_SIZE_LIMIT
             {
-                actions.push(Action::Rename(deleted_paths.pop().unwrap(), new_paths[0]));
+                while !deleted_paths.is_empty() && !new_paths.is_empty() {
+                    actions.push(Action::Rename(
+                        deleted_paths.pop().unwrap(),
+                        new_paths.pop().unwrap(),
+                    ));
+                }
             // if there are few renames, do a full search
             } else {
-                let pairings = rename_detection::optimal_pairings(new_paths, deleted_paths);
+                let pairings = rename_detection::optimal_pairings(&new_paths, deleted_paths);
 
                 // Collect the deleted-path indices that were consumed by a rename so
                 // we can remove them from the pool afterwards.
@@ -271,6 +276,8 @@ impl FL {
                 for (new_path, deleted_idx) in pairings {
                     actions.push(Action::Rename(deleted_paths[deleted_idx], new_path));
                     used_deleted.push(deleted_idx);
+                    // remove new_path from `new_paths`, because it is now claimed by rename
+                    new_paths.remove(new_paths.iter().position(|p| p == &new_path).unwrap());
                 }
 
                 // remove every index in `used_deleted` from `deleted_paths`, by removing last index first so earlier indexes remain valid
@@ -280,6 +287,10 @@ impl FL {
                 }
             }
 
+            // Any new path that was not claimed by a rename is a true addition
+            for path in new_paths {
+                actions.push(Action::Add(path));
+            }
             if deleted_paths.is_empty() {
                 deleted_by_hash.remove(hash);
             }
