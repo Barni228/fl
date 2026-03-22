@@ -30,6 +30,24 @@ pub fn read_to_string(path: impl AsRef<Path>) -> String {
     }
 }
 
+pub fn copy(from: impl AsRef<Path>, to: impl AsRef<Path>) {
+    match fs::copy(&from, &to) {
+        Ok(_) => println!(
+            "Copied '{}' to '{}'",
+            from.as_ref().display(),
+            to.as_ref().display()
+        ),
+        Err(e) => {
+            eprintln!(
+                "fatal: Failed to copy '{}' to '{}': {e}",
+                from.as_ref().display(),
+                to.as_ref().display()
+            );
+            std::process::exit(e.raw_os_error().unwrap_or(1));
+        }
+    }
+}
+
 pub fn find_root_path() -> PathBuf {
     let mut dir = current_dir();
 

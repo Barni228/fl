@@ -129,36 +129,6 @@ impl FL {
 
 // public methods
 impl FL {
-    /// Recomputes the number of commits by scanning the history directory.
-    ///
-    /// This reads all files in `.fl/history`, parses their numeric names,
-    /// and sets `self.commits` to the next available index.
-    ///
-    /// Invalid filenames are ignored with a warning.
-    pub fn update_commits(&mut self) {
-        let history_path = self.history_folder_path();
-
-        let commits = fs_helper::read_dir(&history_path)
-            .filter_map(Result::ok) // ignore read errors
-            .filter_map(|e| e.file_name().into_string().ok()) // convert file name to string
-            .filter_map(|s| {
-                // convert string to number
-                s.parse::<u32>()
-                    .inspect_err(|_| {
-                        eprintln!(
-                            "WARNING: invalid history file name: '{}' ({})",
-                            s,
-                            history_path.join(&s).display()
-                        )
-                    })
-                    .ok()
-            })
-            .max()
-            .map_or(0, |n| n + 1);
-
-        self.commits = commits as i32;
-    }
-
     /// Creates a new snapshot of the current state of the repository.
     ///
     /// This generates a file list for the root directory and writes it
@@ -166,14 +136,12 @@ impl FL {
     ///
     /// # Panics
     /// Panics if file listing fails.
-    pub fn update(&mut self) {
-        let out_path = self.history_file_path(self.commits);
+    pub fn update(&self) {
         let mut fl = self.get_filelist();
-        fl.set_output(Some(out_path));
+        fl.set_output(Some(self.root.join(".fl").join("STAGE")));
 
         println!("Updating {}", self.root.display());
         fl.run(vec![self.root.clone()]).unwrap();
-        self.commits += 1;
     }
 
     /// Compares two history snapshots and prints their differences.
@@ -201,13 +169,60 @@ impl FL {
             &self.history_file_path(second),
         );
     }
+
+    pub fn diff_stage(&self, commit: i32) {
+        let commit = self.to_valid_history_index(commit);
+        println!("Diffing {commit} and STAGE");
+        FL::diff_paths(
+            &self.history_file_path(commit),
+            &self.root.join(".fl").join("STAGE"),
+        );
+    }
+
+    pub fn commit(&mut self) {
+        println!("Committing");
+        let out_path = self.history_file_path(self.commits);
+
+        fs_helper::copy(self.root.join(".fl").join("STAGE"), out_path);
+        self.commits += 1;
+    }
 }
 
 // private methods
 impl FL {
-    fn diff_paths(first: &Path, second: &Path) {
-        let content1 = fs_helper::read_to_string(first);
-        let content2 = fs_helper::read_to_string(second);
+    /// Recomputes the number of commits by scanning the history directory.
+    ///
+    /// This reads all files in `.fl/history`, parses their numeric names,
+    /// and sets `self.commits` to the next available index.
+    ///
+    /// Invalid filenames are ignored with a warning.
+    fn update_commits(&mut self) {
+        let history_path = self.history_folder_path();
+
+        let commits = fs_helper::read_dir(&history_path)
+            .filter_map(Result::ok) // ignore read errors
+            .filter_map(|e| e.file_name().into_string().ok()) // convert file name to string
+            .filter_map(|s| {
+                // convert string to number
+                s.parse::<u32>()
+                    .inspect_err(|_| {
+                        eprintln!(
+                            "WARNING: invalid history file name: '{}' ({})",
+                            s,
+                            history_path.join(&s).display()
+                        )
+                    })
+                    .ok()
+            })
+            .max()
+            .map_or(0, |n| n + 1);
+
+        self.commits = commits as i32;
+    }
+
+    fn diff_paths(old: &Path, new: &Path) {
+        let content1 = fs_helper::read_to_string(old);
+        let content2 = fs_helper::read_to_string(new);
 
         let old_by_path: HashMap<&str, &str> = fs_helper::parse_filelist(&content1);
         let new_by_path: HashMap<&str, &str> = fs_helper::parse_filelist(&content2);
