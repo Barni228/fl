@@ -7,3 +7,4 @@ edition = "2024"
 clap = { version = "4.6.0", features = ["cargo"] }
 colored = "3.1.1"
 filelist = { git = "https://github.com/Barni228/filelist", version = "0.2.0" }
+strsim = "0.11.1"

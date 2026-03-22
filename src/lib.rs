@@ -8,6 +8,9 @@ use std::{
 };
 
 mod fs_helper;
+mod rename_detection;
+
+const RENAME_GROUP_SIZE_LIMIT: usize = 8;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Action<'a> {
@@ -166,7 +169,6 @@ impl FL {
     pub fn update(&mut self) {
         let out_path = self.history_file_path(self.commits);
         let mut fl = self.get_filelist();
-        // fl.set_output(Some(root.join(".fl/STAGE")));
         fl.set_output(Some(out_path));
 
         println!("Updating {}", self.root.display());
@@ -209,10 +211,13 @@ impl FL {
 
         let old_by_path: HashMap<&str, &str> = fs_helper::parse_filelist(&content1);
         let new_by_path: HashMap<&str, &str> = fs_helper::parse_filelist(&content2);
-        let mut deleted_by_hash: HashMap<&str, Vec<&str>> = HashMap::new();
 
-        let mut actions = Vec::new();
-        // detect deletions and modifications
+        // Collect paths that disappeared (keyed by hash, for rename detection).
+        // A path goes here only if it is absent from new_by_path entirely —
+        // modifications are handled separately and never enter this map.
+        let mut deleted_by_hash: HashMap<&str, Vec<&str>> = HashMap::new();
+        let mut actions: Vec<Action> = Vec::new();
+
         for (path, old_hash) in &old_by_path {
             match new_by_path.get(path) {
                 None => deleted_by_hash.entry(old_hash).or_default().push(path),
@@ -221,30 +226,75 @@ impl FL {
             }
         }
 
-        // detect additions
+        // Separate newly added paths into true additions vs rename candidates.
+        // A rename candidate is an added path whose hash matches at least one
+        // deleted path — same content, different location.
+        let mut rename_candidates: HashMap<&str, Vec<&str>> = HashMap::new();
+
         for (path, new_hash) in &new_by_path {
             if old_by_path.contains_key(path) {
+                // Path existed before and is still present — already handled above.
                 continue;
-            // if I "deleted" a file, but also "added" exactly the same file but with different path
-            // then it is just a rename / move
-            } else if let Some(deleted_paths) = deleted_by_hash.get_mut(new_hash)
-                && let Some(deleted_path) = deleted_paths.pop()
-            {
-                actions.push(Action::Rename(deleted_path, path));
-            // otherwise it is just a new file
+            }
+            // if file was "deleted" but then "added" with a different name, it is a rename
+            if deleted_by_hash.contains_key(new_hash) {
+                rename_candidates.entry(new_hash).or_default().push(path);
             } else {
                 actions.push(Action::Add(path));
             }
         }
+
+        // Match each group of rename candidates against the pool of deleted paths
+        // that share the same hash. Within a group we want the globally optimal
+        // pairing (minimum total path-distance), not the greedy local optimum.
+        // Because real-world rename groups are tiny (almost always 1-to-1, rarely
+        // more than a handful), we use brute-force permutation search which is
+        // exact and fast enough in practice.
+        for (hash, new_paths) in &rename_candidates {
+            // unwrap: key is guaranteed to exist because we only inserted into
+            // rename_candidates when deleted_by_hash contained the same hash.
+            let deleted_paths = deleted_by_hash.get_mut(hash).unwrap();
+
+            // if there are a lot of renames, randomly choose who gets renamed, because the search is too slow
+            if new_paths.len() > RENAME_GROUP_SIZE_LIMIT
+                || deleted_paths.len() > RENAME_GROUP_SIZE_LIMIT
+            {
+                actions.push(Action::Rename(deleted_paths.pop().unwrap(), new_paths[0]));
+            // if there are few renames, do a full search
+            } else {
+                let pairings = rename_detection::optimal_pairings(new_paths, deleted_paths);
+
+                // Collect the deleted-path indices that were consumed by a rename so
+                // we can remove them from the pool afterwards.
+                let mut used_deleted: Vec<usize> = Vec::new();
+
+                for (new_path, deleted_idx) in pairings {
+                    actions.push(Action::Rename(deleted_paths[deleted_idx], new_path));
+                    used_deleted.push(deleted_idx);
+                }
+
+                // remove every index in `used_deleted` from `deleted_paths`, by removing last index first so earlier indexes remain valid
+                used_deleted.sort_unstable_by(|a, b| b.cmp(a));
+                for idx in used_deleted {
+                    deleted_paths.remove(idx);
+                }
+            }
+
+            if deleted_paths.is_empty() {
+                deleted_by_hash.remove(hash);
+            }
+        }
+
+        // Any deleted path that was not claimed by a rename is a true deletion.
         for paths in deleted_by_hash.values() {
             for path in paths {
                 actions.push(Action::Remove(path));
             }
         }
 
-        // sort all the actions by path
+        // sort actions by path
         actions.sort();
-        for action in actions {
+        for action in &actions {
             println!("{}", action.colored());
         }
     }
@@ -297,14 +347,3 @@ impl FL {
         fl
     }
 }
-
-// TODO: make this `FL` struct that stores needed info like root folder and history indexes
-// TODO: so its going to work like this:
-// update creates a .fl/STAGE file
-// commit copies the .fl/STAGE file to .fl/history/
-// something like "fl st" will compare the STAGE file to the latest history file
-// "fl diff" will compare 2 history files together OR
-// "fl diff" will compare given history file to the STAGE OR
-// "fl diff" will compare most recent history file to the STAGE
-// you can give history files as numbers like (1 instead of 00000001)
-// you can also give history numbers as negative (-1 means last history file, -2 means second to last history file)
