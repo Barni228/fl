@@ -187,8 +187,24 @@ impl FL {
     }
 
     pub fn commit(&mut self) {
-        println!("Committing");
+        let stage_file = self.root.join(".fl").join("STAGE");
         let out_path = self.history_file_path(self.commits);
+
+        // if there is a previous commit, diff against it
+        let changes = if self.commits > 0 {
+            let stage_content = fs_helper::read_to_string(&stage_file);
+            let stage_snapshot = fs_helper::parse_filelist(&stage_content);
+            let history_content =
+                fs_helper::read_to_string(self.history_file_path(self.commits - 1));
+            let history_snapshot = fs_helper::parse_filelist(&history_content);
+            FL::diff_map(&history_snapshot, &stage_snapshot).len()
+        // if this is the first commit, diff against an empty snapshot
+        } else {
+            let stage_content = fs_helper::read_to_string(&stage_file);
+            let stage_snapshot = fs_helper::parse_filelist(&stage_content);
+            FL::diff_map(&HashMap::new(), &stage_snapshot).len()
+        };
+        println!("Committing {} changes", changes);
 
         fs_helper::copy(self.root.join(".fl").join("STAGE"), out_path);
         self.commits += 1;
