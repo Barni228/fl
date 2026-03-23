@@ -49,18 +49,27 @@ pub fn copy(from: impl AsRef<Path>, to: impl AsRef<Path>) {
 }
 
 pub fn find_root_path() -> PathBuf {
-    let mut dir = current_dir();
+    let dir = current_dir();
 
-    loop {
-        let candidate = dir.join(".fl");
-
-        if candidate.is_dir() {
-            return dir;
-        }
-
-        if !dir.pop() {
+    match find_fl_path(dir) {
+        Some(p) => p,
+        None => {
             eprintln!("fatal: not inside an fl repository (or any of the parent directories)");
             std::process::exit(1);
+        }
+    }
+}
+
+pub fn find_fl_path(mut dir: PathBuf) -> Option<PathBuf> {
+    loop {
+        // if dir contains `.fl` folder, return it
+        if dir.join(".fl").is_dir() {
+            return Some(dir);
+        }
+
+        // go one level up, or if there are no more parents then return None
+        if !dir.pop() {
+            return None;
         }
     }
 }

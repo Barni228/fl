@@ -6,16 +6,18 @@
 - [ ] maybe create a `fix` command that fixes invalid `.fl/` folder
 - [ ] Allow commit messages
 - [ ] When committing, print how many changes are committed (like `Committing 5 changes`)
+- [ ] Add `add` and `remove` (`rm`) commands that will add/remove files from STAGE
+- [ ] Add something like `pwd`, that prints current repo path
 
 ## Bugs / Improvements
 
-- [ ] Add tests
 - [ ] Don't panic when `.fl/` folder is invalid (does not contain `history/`, or has weird permissions)
 - [ ] Improve Error handling, so I return `Result` instead of always exiting with error
 - [ ] Add meaningful exit codes (instead of using raw_os_error)
 
 ## Done
 
+- [x] Add tests
 - [x] When there are 2 same files (same hash), if u delete one and rename the other,
       it should somehow nicely know which one got renamed and which one got deleted (right now it randomly chooses one)
 - [x] Print in colors

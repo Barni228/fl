@@ -12,6 +12,13 @@ mod rename_detection;
 
 const RENAME_GROUP_SIZE_LIMIT: usize = 8;
 
+/// Represents a change detected between two file snapshots.
+///
+/// Each variant describes a type of file change:
+/// * `Add` — the file was added
+/// * `Remove` — the file was deleted
+/// * `Modify` — the file content changed
+/// * `Rename` — the file was moved or renamed
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Action<'a> {
     Add(&'a str),
@@ -226,15 +233,31 @@ impl FL {
 
         let old_by_path: HashMap<&str, &str> = fs_helper::parse_filelist(&content1);
         let new_by_path: HashMap<&str, &str> = fs_helper::parse_filelist(&content2);
+        for action in FL::diff_map(&old_by_path, &new_by_path) {
+            println!("{}", action.colored());
+        }
+    }
 
+    /// Computes the differences between two snapshots of files and returns a list of actions.
+    ///
+    /// # Arguments
+    /// * `old` — previous snapshot, maps paths (keys) to hashes (values)
+    /// * `new` — current snapshot, maps paths (keys) to hashes (values)
+    ///
+    /// # Returns
+    /// A sorted list of [`Action`] describing the differences.
+    fn diff_map<'a>(
+        old: &HashMap<&'a str, &'a str>,
+        new: &HashMap<&'a str, &'a str>,
+    ) -> Vec<Action<'a>> {
         // Collect paths that disappeared (keyed by hash, for rename detection).
         // A path goes here only if it is absent from new_by_path entirely —
         // modifications are handled separately and never enter this map.
         let mut deleted_by_hash: HashMap<&str, Vec<&str>> = HashMap::new();
         let mut actions: Vec<Action> = Vec::new();
 
-        for (path, old_hash) in &old_by_path {
-            match new_by_path.get(path) {
+        for (path, old_hash) in old {
+            match new.get(path) {
                 None => deleted_by_hash.entry(old_hash).or_default().push(path),
                 Some(new_hash) if new_hash != old_hash => actions.push(Action::Modify(path)),
                 _ => {}
@@ -246,8 +269,8 @@ impl FL {
         // deleted path — same content, different location.
         let mut rename_candidates: HashMap<&str, Vec<&str>> = HashMap::new();
 
-        for (path, new_hash) in &new_by_path {
-            if old_by_path.contains_key(path) {
+        for (path, new_hash) in new {
+            if old.contains_key(path) {
                 // Path existed before and is still present — already handled above.
                 continue;
             }
@@ -320,9 +343,7 @@ impl FL {
 
         // sort actions by path
         actions.sort();
-        for action in &actions {
-            println!("{}", action.colored());
-        }
+        actions
     }
 
     fn history_folder_path(&self) -> PathBuf {
@@ -373,3 +394,6 @@ impl FL {
         fl
     }
 }
+
+#[cfg(test)]
+mod tests;
