@@ -84,6 +84,17 @@ pub struct FL {
     commits: i32,
 }
 
+// getters
+impl FL {
+    pub fn root(&self) -> &Path {
+        &self.root
+    }
+
+    pub fn commits(&self) -> i32 {
+        self.commits
+    }
+}
+
 // Constructors
 impl FL {
     /// Creates a new `FL` instance for an existing repository root.

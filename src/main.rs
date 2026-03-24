@@ -38,15 +38,19 @@ fn main() {
                 unreachable!()
             }
         }
+        Some(("pwd", _)) => {
+            println!("{}", FL::in_current_dir().root().display());
+        }
         _ => {}
     }
 }
 
 fn get_clap_cmd() -> Command {
     command!()
+        .arg_required_else_help(true)
         .args([
             arg!(-u --update "Automatically update the repo, \
-                this is same as `update` command, but you can pair it with other commands")
+                this will run `update` command, if the command you are running depends on it")
             .overrides_with("no-update"),
             arg!(-U --"no-update" "Don't automatically update the repo, \
              this just cancels out --update flag and has no effect on `update` command"),
@@ -83,5 +87,10 @@ fn get_clap_cmd() -> Command {
                     arg!([MESSAGE] "Commit message"),
                     arg!(-e --empty "Commit with no message"),
                 ]),
+        )
+        .subcommand(
+            Command::new("pwd")
+                .about("Print the current fl repo path")
+                .alias("p"),
         )
 }

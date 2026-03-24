@@ -5,7 +5,6 @@
 - [ ] maybe store history paths in hex numbers instead of regular numbers (`{:08x}`)
 - [ ] maybe create a `fix` command that fixes invalid `.fl/` folder
 - [ ] Add `add` and `remove` (`rm`) commands that will add/remove files from STAGE
-- [ ] Add something like `pwd`, that prints current repo path
 - [ ] Add something like `log`, which prints the history with their messages
 
 ## Bugs / Improvements
@@ -16,6 +15,7 @@
 
 ## Done
 
+- [x] Add something like `pwd`, that prints current repo path
 - [x] Allow commit messages
 - [x] When committing, print how many changes are committed (like `Committing 5 changes`)
 - [x] Add tests
