@@ -122,6 +122,7 @@ impl FL {
     pub fn create_fl_repo(root: PathBuf) -> Self {
         fs_helper::create_dir(root.join(".fl"));
         fs_helper::create_dir(root.join(".fl").join("history"));
+        fs_helper::create_file(root.join(".fl").join("STAGE"));
 
         FL::new(root)
     }
@@ -178,10 +179,19 @@ impl FL {
     }
 
     pub fn diff_stage(&self, commit: i32) {
-        let commit = self.to_valid_history_index(commit);
-        println!("Diffing {commit} and STAGE");
+        // if there are no commits, I if user gave -1 or 0, diff against empty file
+        if self.commits == 0 && [-1, 0].contains(&commit) {
+            println!("Diffing EMPTY and STAGE");
+            FL::diff_content(
+                "",
+                &fs_helper::read_to_string(self.root.join(".fl").join("STAGE")),
+            );
+            return;
+        }
+        let valid_commit = self.to_valid_history_index(commit);
+        println!("Diffing {valid_commit} and STAGE");
         FL::diff_paths(
-            &self.history_file_path(commit),
+            &self.history_file_path(valid_commit),
             &self.root.join(".fl").join("STAGE"),
         );
     }
@@ -246,10 +256,18 @@ impl FL {
     fn diff_paths(old: &Path, new: &Path) {
         let content1 = fs_helper::read_to_string(old);
         let content2 = fs_helper::read_to_string(new);
+        FL::diff_content(&content1, &content2);
+    }
 
-        let old_by_path: HashMap<&str, &str> = fs_helper::parse_filelist(&content1);
-        let new_by_path: HashMap<&str, &str> = fs_helper::parse_filelist(&content2);
-        for action in FL::diff_map(&old_by_path, &new_by_path) {
+    fn diff_content(content1: &str, content2: &str) {
+        let old_by_path: HashMap<&str, &str> = fs_helper::parse_filelist(content1);
+        let new_by_path: HashMap<&str, &str> = fs_helper::parse_filelist(content2);
+        let actions = FL::diff_map(&old_by_path, &new_by_path);
+        if actions.is_empty() {
+            println!("No changes");
+            return;
+        }
+        for action in actions {
             println!("{}", action.colored());
         }
     }

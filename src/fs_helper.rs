@@ -87,6 +87,18 @@ pub fn create_dir(path: impl AsRef<Path>) {
     }
 }
 
+pub fn create_file(path: impl AsRef<Path>) {
+    match fs::write(&path, "") {
+        Ok(_) => {}
+        Err(e) => {
+            eprintln!(
+                "fatal: Failed to create '{}' file: {e}",
+                path.as_ref().display(),
+            );
+            std::process::exit(e.raw_os_error().unwrap_or(1));
+        }
+    }
+}
 pub fn read_dir(path: impl AsRef<Path>) -> fs::ReadDir {
     let read = fs::read_dir(&path);
     match read {
