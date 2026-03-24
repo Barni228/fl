@@ -4,9 +4,9 @@
       so it will print warnings if some file hashes are `ERROR: ...`, or if fl repo is broken
 - [ ] maybe store history paths in hex numbers instead of regular numbers (`{:08x}`)
 - [ ] maybe create a `fix` command that fixes invalid `.fl/` folder
-- [ ] Allow commit messages
 - [ ] Add `add` and `remove` (`rm`) commands that will add/remove files from STAGE
 - [ ] Add something like `pwd`, that prints current repo path
+- [ ] Add something like `log`, which prints the history with their messages
 
 ## Bugs / Improvements
 
@@ -16,6 +16,7 @@
 
 ## Done
 
+- [x] Allow commit messages
 - [x] When committing, print how many changes are committed (like `Committing 5 changes`)
 - [x] Add tests
 - [x] When there are 2 same files (same hash), if u delete one and rename the other,

@@ -7,6 +7,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use crate::fs_helper::FILELIST_MESSAGE_SEP;
+
 mod fs_helper;
 mod rename_detection;
 
@@ -203,21 +205,32 @@ impl FL {
         // if there is a previous commit, diff against it
         let changes = if self.commits > 0 {
             let stage_content = fs_helper::read_to_string(&stage_file);
-            let stage_snapshot = fs_helper::parse_filelist(&stage_content);
+            let stage_snapshot = fs_helper::parse_commit(&stage_content).snapshot;
             let history_content =
                 fs_helper::read_to_string(self.history_file_path(self.commits - 1));
-            let history_snapshot = fs_helper::parse_filelist(&history_content);
+            let history_snapshot = fs_helper::parse_commit(&history_content).snapshot;
             FL::diff_map(&history_snapshot, &stage_snapshot).len()
         // if this is the first commit, diff against an empty snapshot
         } else {
             let stage_content = fs_helper::read_to_string(&stage_file);
-            let stage_snapshot = fs_helper::parse_filelist(&stage_content);
+            let stage_snapshot = fs_helper::parse_commit(&stage_content).snapshot;
             FL::diff_map(&HashMap::new(), &stage_snapshot).len()
         };
         println!("Committing {} changes", changes);
 
         fs_helper::copy(self.root.join(".fl").join("STAGE"), out_path);
         self.commits += 1;
+    }
+
+    pub fn commit_message(&mut self, message: &str) {
+        let commit_path = self.history_file_path(self.commits);
+        self.commit();
+        let content = fs_helper::read_to_string(&commit_path);
+        // prepend the commit message to the file
+        fs_helper::write(
+            &commit_path,
+            format!("{message}\n{FILELIST_MESSAGE_SEP}{content}",),
+        );
     }
 }
 
@@ -260,8 +273,8 @@ impl FL {
     }
 
     fn diff_content(content1: &str, content2: &str) {
-        let old_by_path: HashMap<&str, &str> = fs_helper::parse_filelist(content1);
-        let new_by_path: HashMap<&str, &str> = fs_helper::parse_filelist(content2);
+        let old_by_path: HashMap<&str, &str> = fs_helper::parse_commit(content1).snapshot;
+        let new_by_path: HashMap<&str, &str> = fs_helper::parse_commit(content2).snapshot;
         let actions = FL::diff_map(&old_by_path, &new_by_path);
         if actions.is_empty() {
             println!("No changes");

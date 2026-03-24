@@ -23,12 +23,20 @@ fn main() {
                 None => fl.diff_stage(first),
             }
         }
-        Some(("commit", _)) => {
+        Some(("commit", sub)) => {
             let mut fl = FL::in_current_dir();
             if auto_update {
                 fl.update();
             }
-            fl.commit();
+            let message = sub.get_one::<String>("MESSAGE");
+            let empty = sub.get_flag("empty");
+            if empty || message.is_none() {
+                fl.commit();
+            } else if let Some(m) = message {
+                fl.commit_message(m);
+            } else {
+                unreachable!()
+            }
         }
         _ => {}
     }
@@ -36,24 +44,30 @@ fn main() {
 
 fn get_clap_cmd() -> Command {
     command!()
-        .arg(arg!(-u --update "Automatically update the repo, this is same as `update` command, but you can pair it with other commands").overrides_with("no-update"))
-        .arg(arg!(-U --"no-update" "Don't automatically update the repo, this just cancels out --update flag and has no effect on `update` command").overrides_with("update"))
+        .args([
+            arg!(-u --update "Automatically update the repo, \
+                this is same as `update` command, but you can pair it with other commands")
+            .overrides_with("no-update"),
+            arg!(-U --"no-update" "Don't automatically update the repo, \
+             this just cancels out --update flag and has no effect on `update` command"),
+        ])
         .subcommand(Command::new("init").about("Initialize a new fl repo in current directory"))
         .subcommand(Command::new("update").about("Update the repo, so all new changes are tracked"))
         .subcommand(
             Command::new("diff")
                 .about("Print what has changed between 2 commits")
-                .arg(
+                .args([
                     arg!([FIRST] "First commit")
                         .default_value("-1")
                         .value_parser(value_parser!(i32))
                         .allow_negative_numbers(true),
-                )
-                .arg(
                     arg!([SECOND] "Second commit (STAGE by default)")
                         .value_parser(value_parser!(i32))
                         .allow_negative_numbers(true),
-                ),
+                ]),
         )
-        .subcommand(Command::new("commit").about("Commit changes"))
+        .subcommand(Command::new("commit").about("Commit changes").args([
+            arg!([MESSAGE] "Commit message"),
+            arg!(-e --empty "Commit with no message"),
+        ]))
 }

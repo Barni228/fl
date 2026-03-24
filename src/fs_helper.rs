@@ -6,9 +6,26 @@ use std::{
     path::{Path, PathBuf},
 };
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Commit<'a> {
+    pub message: &'a str,
+    pub snapshot: HashMap<&'a str, &'a str>,
+}
+
+pub const FILELIST_MESSAGE_SEP: &str =
+    "\n================================================================\n";
+
+pub fn parse_commit(content: &'_ str) -> Commit<'_> {
+    let (message, content) = content
+        .rsplit_once(FILELIST_MESSAGE_SEP)
+        .unwrap_or(("", content));
+    let snapshot = parse_filelist(content);
+    Commit { message, snapshot }
+}
+
 // take `&str` content, so that I can return `&str` HashMap
 // if I take something like file path, then I would need to return `String` HashMap
-pub fn parse_filelist(content: &str) -> HashMap<&str, &str> {
+fn parse_filelist(content: &str) -> HashMap<&str, &str> {
     let mut map = HashMap::new();
     for line in content.lines() {
         let (hash, path) = line.split_once('\t').unwrap();
@@ -91,14 +108,25 @@ pub fn create_file(path: impl AsRef<Path>) {
     match fs::write(&path, "") {
         Ok(_) => {}
         Err(e) => {
+            eprintln!("fatal: Failed to create '{}': {e}", path.as_ref().display(),);
+            std::process::exit(e.raw_os_error().unwrap_or(1));
+        }
+    }
+}
+
+pub fn write(path: impl AsRef<Path>, content: impl AsRef<[u8]>) {
+    match fs::write(&path, content) {
+        Ok(_) => {}
+        Err(e) => {
             eprintln!(
-                "fatal: Failed to create '{}' file: {e}",
+                "fatal: Failed to write to '{}': {e}",
                 path.as_ref().display(),
             );
             std::process::exit(e.raw_os_error().unwrap_or(1));
         }
     }
 }
+
 pub fn read_dir(path: impl AsRef<Path>) -> fs::ReadDir {
     let read = fs::read_dir(&path);
     match read {
