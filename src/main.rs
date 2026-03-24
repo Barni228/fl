@@ -51,11 +51,20 @@ fn get_clap_cmd() -> Command {
             arg!(-U --"no-update" "Don't automatically update the repo, \
              this just cancels out --update flag and has no effect on `update` command"),
         ])
-        .subcommand(Command::new("init").about("Initialize a new fl repo in current directory"))
-        .subcommand(Command::new("update").about("Update the repo, so all new changes are tracked"))
+        .subcommand(
+            Command::new("init")
+                .about("Initialize a new fl repo in current directory")
+                .alias("i"),
+        )
+        .subcommand(
+            Command::new("update")
+                .about("Update the repo, so all new changes are tracked")
+                .alias("u"),
+        )
         .subcommand(
             Command::new("diff")
                 .about("Print what has changed between 2 commits")
+                .alias("d")
                 .args([
                     arg!([FIRST] "First commit")
                         .default_value("-1")
@@ -66,8 +75,13 @@ fn get_clap_cmd() -> Command {
                         .allow_negative_numbers(true),
                 ]),
         )
-        .subcommand(Command::new("commit").about("Commit changes").args([
-            arg!([MESSAGE] "Commit message"),
-            arg!(-e --empty "Commit with no message"),
-        ]))
+        .subcommand(
+            Command::new("commit")
+                .about("Commit changes")
+                .alias("c")
+                .args([
+                    arg!([MESSAGE] "Commit message"),
+                    arg!(-e --empty "Commit with no message"),
+                ]),
+        )
 }
