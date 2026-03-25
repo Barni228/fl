@@ -142,6 +142,50 @@ fn test_diff_rename_best_match() {
 }
 
 #[test]
+fn test_diff_rename_best_many() {
+    // alpha.txt → alpha_v2.txt is a better match (lower edit distance) than alpha.txt → gamma.txt
+    let before = hm([
+        ("one", "H"),
+        ("two", "H"),
+        ("three", "H"),
+        ("four", "H"),
+        ("five", "H"),
+        ("six", "H"),
+        ("seven", "H"),
+        ("eight", "H"),
+        ("nine", "H"),
+        ("ten", "H"),
+    ]);
+    let after = hm([
+        ("One.txt", "H"),
+        ("Two.txt", "H"),
+        ("Three.txt", "H"),
+        ("Four.txt", "H"),
+        ("Five.txt", "H"),
+        ("Six.txt", "H"),
+        ("Seven.txt", "H"),
+        ("Eight.txt", "H"),
+        ("Nine.txt", "H"),
+        ("Ten.txt", "H"),
+    ]);
+    assert_eq!(
+        FL::diff_map(&before, &after),
+        vec![
+            Action::Rename("eight", "Eight.txt"),
+            Action::Rename("five", "Five.txt"),
+            Action::Rename("four", "Four.txt"),
+            Action::Rename("nine", "Nine.txt"),
+            Action::Rename("one", "One.txt"),
+            Action::Rename("seven", "Seven.txt"),
+            Action::Rename("six", "Six.txt"),
+            Action::Rename("ten", "Ten.txt"),
+            Action::Rename("three", "Three.txt"),
+            Action::Rename("two", "Two.txt"),
+        ]
+    );
+}
+
+#[test]
 fn test_diff_rename_and_remove() {
     // Two deleted, one added → one rename + one true deletion
     let before = hm([("a.txt", "H"), ("b.txt", "H")]);

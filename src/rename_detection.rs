@@ -1,119 +1,97 @@
-/// Find the globally optimal pairing between `new_paths` and `deleted_paths`
-/// using brute-force permutation search over the smaller set.
+/// Find the globally optimal pairing between `old_paths` and `new_paths`,
+/// minimizing total [`path_distance`].
 ///
-/// Returns a list of `(new_path, deleted_index)` pairs that minimize total
-/// path distance. Unpaired items on either side are left out — the caller
-/// handles the leftover deleted paths as true deletions and the leftover new
-/// paths were already emitted as additions before this function is called.
-///
-/// # Complexity
-/// O(min(n,d)!) in the size of the smaller set. This is only called for paths
-/// that share an identical hash, so groups larger than ~8 are vanishingly rare
-/// in practice.
+/// Returns a list of `(old_path, new_path)` pairs
 pub fn optimal_pairings<'a>(
+    old_paths: &[&'a str],
     new_paths: &[&'a str],
-    deleted_paths: &[&'a str],
-) -> Vec<(&'a str, usize)> {
-    // Orient so we always permute the smaller set against the larger one.
-    // `a` indexes into new_paths, `b` indexes into deleted_paths.
-    let (shorter, longer, swapped) = if new_paths.len() <= deleted_paths.len() {
-        (new_paths, deleted_paths, false)
-    } else {
-        (deleted_paths, new_paths, true)
-    };
+) -> Vec<(&'a str, &'a str)> {
+    // build up the cost matrix
+    // basically it is just a grid where rows are new paths and columns are deleted paths
+    // and every cell in there is the distance between the two
+    // so something like:
+    // |         | new | the | poppy |
+    // |---------|-----|-----|-------|
+    // | old     |  3  |  3  |   4   |
+    // | there   |  4  |  2  |   5   |
 
-    let n = shorter.len();
-    // Choose n indices from `longer` to pair with `shorter[0..n]`.
-    // We try every permutation of every n-subset of `longer`.
-    let longer_indices: Vec<usize> = (0..longer.len()).collect();
-
-    let mut best_cost = usize::MAX;
-    let mut best_assignment: Vec<usize> = Vec::new(); // longer index for each shorter index
-
-    // Generate all n-subsets of longer_indices, then all permutations of each.
-    for_each_permutation_of_subset(&longer_indices, n, &mut |perm: &[usize]| {
-        let cost: usize = perm
-            .iter()
-            .enumerate()
-            .map(|(i, &j)| {
-                let (np, dp) = if swapped {
-                    (longer[j], shorter[i])
-                } else {
-                    (shorter[i], longer[j])
-                };
-                path_distance(np, dp)
-            })
-            .sum();
-
-        if cost < best_cost {
-            best_cost = cost;
-            best_assignment = perm.to_vec();
-        }
-    });
-
-    if best_assignment.is_empty() {
-        return Vec::new();
-    }
-
-    best_assignment
+    let costs: Vec<usize> = old_paths
         .iter()
+        .flat_map(|n| new_paths.iter().map(|d| path_distance(n, d)))
+        .collect();
+
+    // hungarian algorithm will pair every row with every column once, in a way to minimize the total cost
+    // so `old -> new` and `the -> there`, and `troll` is left out, making the total cost `5`
+    hungarian::minimize(&costs, old_paths.len(), new_paths.len())
+        .into_iter()
         .enumerate()
-        .map(|(i, &j)| {
-            if swapped {
-                // shorter = deleted_paths, longer = new_paths
-                (longer[j], i) // (new_path, deleted_index)
-            } else {
-                // shorter = new_paths, longer = deleted_paths
-                (shorter[i], j) // (new_path, deleted_index)
-            }
-        })
+        // convert (usize, Option<usize>) to (usize, usize)
+        .filter_map(|(old, maybe_new)| maybe_new.map(|new| (old, new)))
+        // convert the indexes (usize, usize) to (new_path, deleted_path)
+        .map(|(old, new)| (old_paths[old], new_paths[new]))
         .collect()
 }
 
-/// Iterate over every permutation of every `k`-sized subset of `items`,
-/// calling `f` for each permutation.
-fn for_each_permutation_of_subset<T: Copy>(items: &[T], k: usize, f: &mut impl FnMut(&[T])) {
-    let mut chosen = Vec::with_capacity(k);
-    let mut used = vec![false; items.len()];
-    permute(items, k, &mut chosen, &mut used, f);
-}
-
-fn permute<T: Copy>(
-    items: &[T],
-    remaining: usize,
-    chosen: &mut Vec<T>,
-    used: &mut Vec<bool>,
-    f: &mut impl FnMut(&[T]),
-) {
-    if remaining == 0 {
-        f(chosen);
-        return;
-    }
-    for i in 0..items.len() {
-        if !used[i] {
-            used[i] = true;
-            chosen.push(items[i]);
-            permute(items, remaining - 1, chosen, used, f);
-            chosen.pop();
-            used[i] = false;
-        }
-    }
-}
-
-/// Score the dissimilarity between two paths. Lower is more similar.
+/// Returns how different the two paths are
 ///
-/// The filename component is weighted more heavily than the directory component
-/// because a file moved to a sibling directory is a more common and more
-/// "obvious" rename than one that is also renamed at the same time.
-fn path_distance(a: &str, b: &str) -> usize {
-    let a_name = a.rsplit('/').next().unwrap_or(a);
-    let b_name = b.rsplit('/').next().unwrap_or(b);
-    let a_dir = a.rsplit_once('/').map_or("", |(dir, _)| dir);
-    let b_dir = b.rsplit_once('/').map_or("", |(dir, _)| dir);
+/// Bigger number = more different
+/// 0 = exactly the same
+/// It values file name changes more than directory changes
+/// So `foo -> src/foo` is less than `foo -> bob`
+pub fn path_distance(a: &str, b: &str) -> usize {
+    let (a_dir, a_name) = a.rsplit_once('/').unwrap_or(("", a));
+    let (b_dir, b_name) = b.rsplit_once('/').unwrap_or(("", b));
 
     let name_dist = strsim::damerau_levenshtein(a_name, b_name);
     let dir_dist = strsim::damerau_levenshtein(a_dir, b_dir);
 
-    // Filename similarity matters more than directory similarity.
     name_dist * 3 + dir_dist
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // this is mainly to make sure the comment in `path_distance` is correct
+    #[test]
+    fn test_optimal_pairings() {
+        let old_paths = ["old", "there"];
+        let new_paths = ["new", "the", "poppy"];
+        assert_eq!(
+            optimal_pairings(&old_paths, &new_paths),
+            vec![("old", "new"), ("there", "the")]
+        );
+    }
+
+    #[test]
+    fn test_hungarian() {
+        // I know that these "path_differences" have to be multiplied by 3, but for simplicity this is good enough
+        #[rustfmt::skip]
+        let costs = [
+            3, 3, 4,
+            4, 2, 5,
+        ];
+
+        // match 0 (index) to Some(0) ()
+        assert_eq!(
+            hungarian::minimize(&costs, 2, 3),
+            vec![
+                // [0] in this vec, so column[0] is paired with row[0]
+                Some(0),
+                // [1], so column[1] is paired with row[1]
+                Some(1)
+            ]
+        );
+    }
+
+    #[test]
+    fn test_path_difference() {
+        assert_eq!(path_distance("old", "new"), 3 * 3);
+        assert_eq!(path_distance("old", "the"), 3 * 3);
+        assert_eq!(path_distance("old", "poppy"), 4 * 3);
+
+        assert_eq!(path_distance("there", "new"), 4 * 3);
+        assert_eq!(path_distance("there", "the"), 2 * 3);
+        assert_eq!(path_distance("there", "poppy"), 5 * 3);
+    }
 }

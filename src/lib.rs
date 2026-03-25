@@ -12,8 +12,6 @@ use crate::fs_helper::FILELIST_MESSAGE_SEP;
 mod fs_helper;
 mod rename_detection;
 
-const RENAME_GROUP_SIZE_LIMIT: usize = 8;
-
 /// Represents a change detected between two file snapshots.
 ///
 /// Each variant describes a type of file change:
@@ -349,9 +347,8 @@ impl FL {
         old: &HashMap<&'a str, &'a str>,
         new: &HashMap<&'a str, &'a str>,
     ) -> Vec<Action<'a>> {
-        // Collect paths that disappeared (keyed by hash, for rename detection).
-        // A path goes here only if it is absent from new_by_path entirely —
-        // modifications are handled separately and never enter this map.
+        // Paths that were deleted are stored here by hash, for rename detection.
+        // only path that are missing come here, modifications never enter this map
         let mut deleted_by_hash: HashMap<&str, Vec<&str>> = HashMap::new();
         let mut actions: Vec<Action> = Vec::new();
 
@@ -363,9 +360,7 @@ impl FL {
             }
         }
 
-        // Separate newly added paths into true additions vs rename candidates.
-        // A rename candidate is an added path whose hash matches at least one
-        // deleted path — same content, different location.
+        // A hash from `deleted_by_hash` as key, a list of new paths with that hash as value.
         let mut rename_candidates: HashMap<&str, Vec<&str>> = HashMap::new();
 
         for (path, new_hash) in new {
@@ -392,51 +387,37 @@ impl FL {
             // rename_candidates when deleted_by_hash contained the same hash.
             let deleted_paths = deleted_by_hash.get_mut(hash).unwrap();
 
-            // if there are a lot of renames, randomly choose who gets renamed, because the search is too slow
-            if new_paths.len() > RENAME_GROUP_SIZE_LIMIT
-                || deleted_paths.len() > RENAME_GROUP_SIZE_LIMIT
-            {
-                while !deleted_paths.is_empty() && !new_paths.is_empty() {
-                    actions.push(Action::Rename(
-                        deleted_paths.pop().unwrap(),
-                        new_paths.pop().unwrap(),
-                    ));
-                }
-            // if there are few renames, do a full search
-            } else {
-                let pairings = rename_detection::optimal_pairings(&new_paths, deleted_paths);
+            let pairings = rename_detection::optimal_pairings(deleted_paths, &new_paths);
 
-                // Collect the deleted-path indices that were consumed by a rename so
-                // we can remove them from the pool afterwards.
-                let mut used_deleted: Vec<usize> = Vec::new();
-
-                for (new_path, deleted_idx) in pairings {
-                    actions.push(Action::Rename(deleted_paths[deleted_idx], new_path));
-                    used_deleted.push(deleted_idx);
-                    // remove new_path from `new_paths`, because it is now claimed by rename
-                    new_paths.remove(new_paths.iter().position(|p| p == &new_path).unwrap());
-                }
-
-                // remove every index in `used_deleted` from `deleted_paths`, by removing last index first so earlier indexes remain valid
-                used_deleted.sort_unstable_by(|a, b| b.cmp(a));
-                for idx in used_deleted {
-                    deleted_paths.remove(idx);
-                }
+            // for (new_path, deleted_path) in pairings {
+            for (deleted_path, new_path) in pairings {
+                actions.push(Action::Rename(deleted_path, new_path));
+                // remove `new_path` from `new_paths`, because it is now claimed by rename
+                // the order doesn't matter, since i don't index new_paths, so use swap_remove (very fast)
+                new_paths.swap_remove(new_paths.iter().position(|p| p == &new_path).unwrap());
+                // same as above
+                deleted_paths.swap_remove(
+                    deleted_paths
+                        .iter()
+                        .position(|p| p == &deleted_path)
+                        .unwrap(),
+                );
             }
-
             // Any new path that was not claimed by a rename is a true addition
             for path in new_paths {
                 actions.push(Action::Add(path));
             }
+            // if i removed all paths, might as well remove the hash from deleted_by_hash
+            // since I know I will never do deleted_paths[hash] again, I can remove it (not required though)
             if deleted_paths.is_empty() {
                 deleted_by_hash.remove(hash);
             }
         }
 
         // Any deleted path that was not claimed by a rename is a true deletion.
-        for paths in deleted_by_hash.values() {
-            for path in paths {
-                actions.push(Action::Remove(path));
+        for deleted_paths in deleted_by_hash.values() {
+            for deleted_path in deleted_paths {
+                actions.push(Action::Remove(deleted_path));
             }
         }
 
