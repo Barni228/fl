@@ -84,17 +84,6 @@ pub struct FL {
     commits: i32,
 }
 
-// getters
-impl FL {
-    pub fn root(&self) -> &Path {
-        &self.root
-    }
-
-    pub fn commits(&self) -> i32 {
-        self.commits
-    }
-}
-
 // Constructors
 impl FL {
     /// Creates a new `FL` instance for an existing repository root.
@@ -145,6 +134,17 @@ impl FL {
     /// This is a convenience wrapper around [`FL::create_fl_repo`].
     pub fn init() -> Self {
         FL::create_fl_repo(fs_helper::current_dir())
+    }
+}
+
+// getters
+impl FL {
+    pub fn root(&self) -> &Path {
+        &self.root
+    }
+
+    pub fn commits(&self) -> i32 {
+        self.commits
     }
 }
 
@@ -242,6 +242,47 @@ impl FL {
             &commit_path,
             format!("{message}\n{FILELIST_MESSAGE_SEP}{content}",),
         );
+    }
+
+    pub fn print_short_log(&self) {
+        // TODO: these should be config options
+        let print_title = true;
+        let print_title_quotes = false;
+        let print_number_of_changes = true;
+
+        for i in 0..self.commits {
+            let path = self.history_file_path(i);
+            let content = fs_helper::read_to_string(&path);
+            let commit = fs_helper::parse_commit(&content);
+
+            let title = match print_title {
+                true => commit
+                    .message
+                    .and_then(|m| m.lines().next()) // get the first line of the message
+                    .unwrap_or("No commit message"),
+                false => "",
+            };
+            let title_quotes = match print_title_quotes {
+                true => "\"",
+                false => "",
+            };
+
+            let changes = match print_number_of_changes {
+                true => {
+                    let prev_content = if i > 0 {
+                        fs_helper::read_to_string(self.history_file_path(i - 1))
+                    } else {
+                        String::new()
+                    };
+                    let prev_snapshot = fs_helper::parse_commit(&prev_content).snapshot;
+                    let num_changes = FL::diff_map(&prev_snapshot, &commit.snapshot).len();
+                    format!(" ({num_changes} Changes)")
+                }
+                false => String::new(),
+            };
+
+            println!("{i}: {title_quotes}{title}{title_quotes}{changes}");
+        }
     }
 }
 

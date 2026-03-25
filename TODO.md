@@ -2,13 +2,15 @@
 
 - [ ] Add something like `check`, that checks if everything is alright
       so it will print warnings if some file hashes are `ERROR: ...`, or if fl repo is broken
-- [ ] maybe store history paths in hex numbers instead of regular numbers (`{:08x}`)
 - [ ] maybe create a `fix` command that fixes invalid `.fl/` folder
 - [ ] Add `add` and `remove` (`rm`) commands that will add/remove files from STAGE
 - [ ] Add something like `log`, which prints the history with their messages
+- [ ] Add a way to edit commit history
+- [ ] Make commits have a date and time
 
 ## Bugs / Improvements
 
+- [ ] maybe store history paths in hex numbers instead of regular numbers (`{:08x}`)
 - [ ] Don't panic when `.fl/` folder is invalid (does not contain `history/`, or has weird permissions)
 - [ ] Improve Error handling, so I return `Result` instead of always exiting with error
 - [ ] Add meaningful exit codes (instead of using raw_os_error)

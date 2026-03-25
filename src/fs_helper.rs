@@ -8,7 +8,7 @@ use std::{
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Commit<'a> {
-    pub message: &'a str,
+    pub message: Option<&'a str>,
     pub snapshot: HashMap<&'a str, &'a str>,
 }
 
@@ -16,10 +16,11 @@ pub const FILELIST_MESSAGE_SEP: &str =
     "\n================================================================\n";
 
 pub fn parse_commit(content: &'_ str) -> Commit<'_> {
-    let (message, content) = content
-        .rsplit_once(FILELIST_MESSAGE_SEP)
-        .unwrap_or(("", content));
-    let snapshot = parse_filelist(content);
+    let (message, snapshot_str) = match content.rsplit_once(FILELIST_MESSAGE_SEP) {
+        Some((message, snapshot_str)) => (Some(message), snapshot_str),
+        None => (None, content),
+    };
+    let snapshot = parse_filelist(snapshot_str);
     Commit { message, snapshot }
 }
 

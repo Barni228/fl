@@ -38,6 +38,9 @@ fn main() {
                 unreachable!()
             }
         }
+        Some(("log", _)) => {
+            FL::in_current_dir().print_short_log();
+        }
         Some(("pwd", _)) => {
             println!("{}", FL::in_current_dir().root().display());
         }
@@ -55,17 +58,13 @@ fn get_clap_cmd() -> Command {
             arg!(-U --"no-update" "Don't automatically update the repo, \
              this just cancels out --update flag and has no effect on `update` command"),
         ])
-        .subcommand(
+        .subcommands([
             Command::new("init")
                 .about("Initialize a new fl repo in current directory")
                 .alias("i"),
-        )
-        .subcommand(
             Command::new("update")
                 .about("Update the repo, so all new changes are tracked")
                 .alias("u"),
-        )
-        .subcommand(
             Command::new("diff")
                 .about("Print what has changed between 2 commits")
                 .alias("d")
@@ -78,8 +77,6 @@ fn get_clap_cmd() -> Command {
                         .value_parser(value_parser!(i32))
                         .allow_negative_numbers(true),
                 ]),
-        )
-        .subcommand(
             Command::new("commit")
                 .about("Commit changes")
                 .alias("c")
@@ -87,10 +84,9 @@ fn get_clap_cmd() -> Command {
                     arg!([MESSAGE] "Commit message"),
                     arg!(-e --empty "Commit with no message"),
                 ]),
-        )
-        .subcommand(
+            Command::new("log").about("Print history log").alias("l"),
             Command::new("pwd")
                 .about("Print the current fl repo path")
                 .alias("p"),
-        )
+        ])
 }
