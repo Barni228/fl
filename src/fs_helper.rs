@@ -1,39 +1,11 @@
+#![allow(dead_code)]
+
 //! [`std::fs`] functions, but instead of returning [`std::io::Result`] it exits with nice errors
 
-use std::collections::HashMap;
 use std::{
     fs,
     path::{Path, PathBuf},
 };
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Commit<'a> {
-    pub message: Option<&'a str>,
-    pub snapshot: HashMap<&'a str, &'a str>,
-}
-
-pub const FILELIST_MESSAGE_SEP: &str =
-    "\n================================================================\n";
-
-pub fn parse_commit(content: &'_ str) -> Commit<'_> {
-    let (message, snapshot_str) = match content.rsplit_once(FILELIST_MESSAGE_SEP) {
-        Some((message, snapshot_str)) => (Some(message), snapshot_str),
-        None => (None, content),
-    };
-    let snapshot = parse_filelist(snapshot_str);
-    Commit { message, snapshot }
-}
-
-// take `&str` content, so that I can return `&str` HashMap
-// if I take something like file path, then I would need to return `String` HashMap
-fn parse_filelist(content: &str) -> HashMap<&str, &str> {
-    let mut map = HashMap::new();
-    for line in content.lines() {
-        let (hash, path) = line.split_once('\t').unwrap();
-        map.insert(path, hash);
-    }
-    map
-}
 
 pub fn read_to_string(path: impl AsRef<Path>) -> String {
     match fs::read_to_string(&path) {
@@ -41,6 +13,19 @@ pub fn read_to_string(path: impl AsRef<Path>) -> String {
         Err(e) => {
             eprintln!(
                 "fatal: Failed to read '{}' file: {e}",
+                path.as_ref().display()
+            );
+            std::process::exit(e.raw_os_error().unwrap_or(1));
+        }
+    }
+}
+
+pub fn open(path: impl AsRef<Path>) -> fs::File {
+    match fs::File::open(&path) {
+        Ok(f) => f,
+        Err(e) => {
+            eprintln!(
+                "fatal: Failed to open '{}' file: {e}",
                 path.as_ref().display()
             );
             std::process::exit(e.raw_os_error().unwrap_or(1));

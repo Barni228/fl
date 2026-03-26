@@ -1,6 +1,7 @@
-use std::fs;
+use serde_json::json;
 
 use super::*;
+use std::fs;
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -363,12 +364,19 @@ fn test_update() {
     let fl = FL::new(test_folder.clone());
     fl.update();
 
+    let content = fs::read_to_string(fl.stage_path()).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&content).unwrap();
+
     assert_eq!(
-        fs::read_to_string(test_folder.join(".fl").join("STAGE")).unwrap(),
-        concat!(
-            "7f39224e335994886c26ba8c241fcbe1d474aadaa2bd0a8e842983b098cea894\t./\n",
-            "5891b5b522d5df086d0ff0b110fbd9d21bb4fc7163af34d08286a2e846f6be03\tfile.txt\n",
-        )
+        parsed,
+        json!({
+            "title": null,
+            "body": null,
+            "snapshot": {
+                "./": "7f39224e335994886c26ba8c241fcbe1d474aadaa2bd0a8e842983b098cea894",
+                "file.txt": "5891b5b522d5df086d0ff0b110fbd9d21bb4fc7163af34d08286a2e846f6be03",
+            },
+        })
     );
 
     // cleanup after

@@ -31,9 +31,9 @@ fn main() {
             let message = sub.get_one::<String>("MESSAGE");
             let empty = sub.get_flag("empty");
             if empty || message.is_none() {
-                fl.commit();
+                fl.commit_empty();
             } else if let Some(m) = message {
-                fl.commit_message(m);
+                fl.commit_message(m.to_string(), Default::default());
             } else {
                 unreachable!()
             }

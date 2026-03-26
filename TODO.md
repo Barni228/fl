@@ -4,13 +4,14 @@
       so it will print warnings if some file hashes are `ERROR: ...`, or if fl repo is broken
 - [ ] maybe create a `fix` command that fixes invalid `.fl/` folder
 - [ ] Add `add` and `remove` (`rm`) commands that will add/remove files from STAGE
-- [ ] Add something like `log`, which prints the history with their messages
 - [ ] Add a way to edit commit history
 - [ ] Make commits have a date and time
-- [ ] maybe store commit files in some known format like `json`, `toml`, or `yaml`
+- [ ] Allow commits to have body text
+- [ ] Improve `filelist` so it can return `BTreeMap` directory, instead of parsing strings
 
 ## Bugs / Improvements
 
+- [ ] maybe remove dead code from `fs_helper.rs`
 - [ ] maybe store history paths in hex numbers instead of regular numbers (`{:08x}`)
 - [ ] Don't panic when `.fl/` folder is invalid (does not contain `history/`, or has weird permissions)
 - [ ] Improve Error handling, so I return `Result` instead of always exiting with error
@@ -18,6 +19,8 @@
 
 ## Done
 
+- [x] maybe store commit files in some known format like `json`, `toml`, or `yaml`
+- [x] Add something like `log`, which prints the history with their messages
 - [x] use [PathFinding](https://github.com/samueltardieu/pathfinding) instead of hungarian crate
 - [x] Add something like `pwd`, that prints current repo path
 - [x] Allow commit messages

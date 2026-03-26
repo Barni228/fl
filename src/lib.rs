@@ -7,8 +7,9 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::fs_helper::FILELIST_MESSAGE_SEP;
+use crate::commit::Commit;
 
+pub mod commit;
 mod fs_helper;
 mod rename_detection;
 
@@ -122,7 +123,7 @@ impl FL {
     pub fn create_fl_repo(root: PathBuf) -> Self {
         fs_helper::create_dir(root.join(".fl"));
         fs_helper::create_dir(root.join(".fl").join("history"));
-        fs_helper::create_file(root.join(".fl").join("STAGE"));
+        Commit::default().save_to(root.join(".fl").join("STAGE.json"));
 
         FL::new(root)
     }
@@ -157,10 +158,16 @@ impl FL {
     /// Panics if file listing fails.
     pub fn update(&self) {
         let mut fl = self.get_filelist();
-        fl.set_output(Some(self.root.join(".fl").join("STAGE")));
-
+        let mut commit = commit::Commit::default();
+        let output = self.stage_path();
         println!("Updating {}", self.root.display());
-        fl.run(vec![self.root.clone()]).unwrap();
+
+        for line in fl.hash_paths(vec![self.root.clone()]) {
+            let (hash, path) = line.trim().split_once('\t').unwrap();
+            commit.snapshot.insert(path.to_string(), hash.to_string());
+        }
+
+        commit.save_to(output);
     }
 
     /// Compares two history snapshots and prints their differences.
@@ -190,56 +197,31 @@ impl FL {
     }
 
     pub fn diff_stage(&self, commit: i32) {
-        // if there are no commits, I if user gave -1 or 0, diff against empty file
-        if self.commits == 0 && [-1, 0].contains(&commit) {
+        let stage = Commit::from_path(self.stage_path());
+        // if there are no commits, if user gave -1 or 0, diff against empty commit
+        let target_commit = if self.commits == 0 && [-1, 0].contains(&commit) {
             println!("Diffing EMPTY and STAGE");
-            FL::diff_content(
-                "",
-                &fs_helper::read_to_string(self.root.join(".fl").join("STAGE")),
-            );
-            return;
-        }
-        let valid_commit = self.to_valid_history_index(commit);
-        println!("Diffing {valid_commit} and STAGE");
-        FL::diff_paths(
-            &self.history_file_path(valid_commit),
-            &self.root.join(".fl").join("STAGE"),
-        );
-    }
-
-    pub fn commit(&mut self) {
-        let stage_file = self.root.join(".fl").join("STAGE");
-        let out_path = self.history_file_path(self.commits);
-
-        // if there is a previous commit, diff against it
-        let changes = if self.commits > 0 {
-            let stage_content = fs_helper::read_to_string(&stage_file);
-            let stage_snapshot = fs_helper::parse_commit(&stage_content).snapshot;
-            let history_content =
-                fs_helper::read_to_string(self.history_file_path(self.commits - 1));
-            let history_snapshot = fs_helper::parse_commit(&history_content).snapshot;
-            FL::diff_map(&history_snapshot, &stage_snapshot).len()
-        // if this is the first commit, diff against an empty snapshot
+            Commit::default()
         } else {
-            let stage_content = fs_helper::read_to_string(&stage_file);
-            let stage_snapshot = fs_helper::parse_commit(&stage_content).snapshot;
-            FL::diff_map(&HashMap::new(), &stage_snapshot).len()
+            let valid_commit = self.to_valid_history_index(commit);
+            println!("Diffing {valid_commit} and STAGE");
+            Commit::from_path(self.history_file_path(valid_commit))
         };
-        println!("Committing {} changes", changes);
-
-        fs_helper::copy(self.root.join(".fl").join("STAGE"), out_path);
-        self.commits += 1;
+        let actions = FL::diff_commit(&target_commit, &stage);
+        FL::print_actions(&actions);
     }
 
-    pub fn commit_message(&mut self, message: &str) {
-        let commit_path = self.history_file_path(self.commits);
-        self.commit();
-        let content = fs_helper::read_to_string(&commit_path);
-        // prepend the commit message to the file
-        fs_helper::write(
-            &commit_path,
-            format!("{message}\n{FILELIST_MESSAGE_SEP}{content}",),
-        );
+    /// Commit the STAGE file, without a commit message
+    pub fn commit_empty(&mut self) {
+        let stage = Commit::from_path(self.stage_path());
+        self.commit_commit(&stage);
+    }
+
+    pub fn commit_message(&mut self, title: String, body: String) {
+        let mut stage = Commit::from_path(self.stage_path());
+        stage.title = Some(title);
+        stage.body = Some(body);
+        self.commit_commit(&stage);
     }
 
     pub fn print_short_log(&self) {
@@ -250,16 +232,13 @@ impl FL {
 
         for i in 0..self.commits {
             let path = self.history_file_path(i);
-            let content = fs_helper::read_to_string(&path);
-            let commit = fs_helper::parse_commit(&content);
+            let commit = Commit::from_path(&path);
 
             let title = match print_title {
-                true => commit
-                    .message
-                    .and_then(|m| m.lines().next()) // get the first line of the message
-                    .unwrap_or("No commit message"),
+                true => commit.title.as_deref().unwrap_or("No commit message"),
                 false => "",
             };
+
             let title_quotes = match print_title_quotes {
                 true => "\"",
                 false => "",
@@ -267,13 +246,12 @@ impl FL {
 
             let changes = match print_number_of_changes {
                 true => {
-                    let prev_content = if i > 0 {
-                        fs_helper::read_to_string(self.history_file_path(i - 1))
+                    let prev_commit = if i > 0 {
+                        Commit::from_path(self.history_file_path(i - 1))
                     } else {
-                        String::new()
+                        Commit::default()
                     };
-                    let prev_snapshot = fs_helper::parse_commit(&prev_content).snapshot;
-                    let num_changes = FL::diff_map(&prev_snapshot, &commit.snapshot).len();
+                    let num_changes = FL::diff_commit(&prev_commit, &commit).len();
                     format!(" ({num_changes} Changes)")
                 }
                 false => String::new(),
@@ -293,22 +271,36 @@ impl FL {
     ///
     /// Invalid filenames are ignored with a warning.
     fn update_commits(&mut self) {
-        let history_path = self.history_folder_path();
+        let history_path = self.history_path();
 
         let commits = fs_helper::read_dir(&history_path)
             .filter_map(Result::ok) // ignore read errors
-            .filter_map(|e| e.file_name().into_string().ok()) // convert file name to string
-            .filter_map(|s| {
-                // convert string to number
-                s.parse::<u32>()
-                    .inspect_err(|_| {
-                        eprintln!(
-                            "WARNING: invalid history file name: '{}' ({})",
-                            s,
-                            history_path.join(&s).display()
-                        )
-                    })
+            // .filter_map(|e| e.inspect_err(warn_invalid).ok())
+            // convert file name to string
+            .filter_map(|e| {
+                e.file_name()
+                    .into_string()
+                    .inspect_err(|os_str| self.warn_invalid_history(os_str.display()))
                     .ok()
+            })
+            // remove ".json" extension
+            .filter_map(|s| {
+                let no_extension = s.strip_suffix(".json");
+                match no_extension {
+                    Some(s) => Some(s.to_string()),
+                    None => {
+                        self.warn_invalid_history(s);
+                        None
+                    }
+                }
+            })
+            // convert string to number
+            .filter_map(|s| match s.parse::<u32>() {
+                Ok(n) => Some(n),
+                Err(_) => {
+                    self.warn_invalid_history(s);
+                    None
+                }
             })
             .max()
             .map_or(0, |n| n + 1);
@@ -316,23 +308,59 @@ impl FL {
         self.commits = commits as i32;
     }
 
-    fn diff_paths(old: &Path, new: &Path) {
-        let content1 = fs_helper::read_to_string(old);
-        let content2 = fs_helper::read_to_string(new);
-        FL::diff_content(&content1, &content2);
+    fn warn_invalid_history(&self, path: impl std::fmt::Display) {
+        eprintln!(
+            "{}: invalid history file name: '{}' ({})",
+            "WARNING".yellow(),
+            path,
+            self.history_path().join(path.to_string()).display()
+        );
     }
 
-    fn diff_content(content1: &str, content2: &str) {
-        let old_by_path: HashMap<&str, &str> = fs_helper::parse_commit(content1).snapshot;
-        let new_by_path: HashMap<&str, &str> = fs_helper::parse_commit(content2).snapshot;
-        let actions = FL::diff_map(&old_by_path, &new_by_path);
+    /// This will commit a [`commit::Commit`] object
+    fn commit_commit(&mut self, commit: &Commit) {
+        let out_path = self.history_file_path(self.commits);
+
+        // if there is a previous commit, diff against it
+        let prev_commit = if self.commits > 0 {
+            Commit::from_path(self.history_file_path(self.commits - 1))
+        } else {
+            Commit::default()
+        };
+
+        let changes = FL::diff_commit(&prev_commit, commit).len();
+        println!("Committing {} changes", changes);
+
+        commit.save_to(out_path);
+        self.commits += 1;
+    }
+
+    fn diff_paths(old: &Path, new: &Path) {
+        let old = Commit::from_path(old);
+        let new = Commit::from_path(new);
+        let actions = FL::diff_commit(&old, &new);
+        FL::print_actions(&actions);
+    }
+
+    fn print_actions(actions: &[Action]) {
         if actions.is_empty() {
             println!("No changes");
             return;
         }
+
         for action in actions {
             println!("{}", action.colored());
         }
+    }
+
+    fn diff_commit<'a>(old: &'a Commit, new: &'a Commit) -> Vec<Action<'a>> {
+        // convert `BTreeMap<String, String>` to `HashMap<&str, &str>`
+        let old_by_path: HashMap<&str, &str> =
+            HashMap::from_iter(old.snapshot.iter().map(|(k, v)| (k.as_str(), v.as_str())));
+        let new_by_path: HashMap<&str, &str> =
+            HashMap::from_iter(new.snapshot.iter().map(|(k, v)| (k.as_str(), v.as_str())));
+
+        FL::diff_map(&old_by_path, &new_by_path)
     }
 
     /// Computes the differences between two snapshots of files and returns a list of actions.
@@ -426,18 +454,23 @@ impl FL {
         actions
     }
 
-    fn history_folder_path(&self) -> PathBuf {
-        self.root.join(".fl").join("history")
+    fn fl_path(&self) -> PathBuf {
+        self.root.join(".fl")
+    }
+
+    fn history_path(&self) -> PathBuf {
+        self.fl_path().join("history")
+    }
+
+    fn stage_path(&self) -> PathBuf {
+        self.fl_path().join("STAGE.json")
     }
 
     /// returns the path to a history file based on its index
     /// This does not check if the file exists, it just converts a number to a path
     /// To get a valid path, use `to_valid_history_index`
     fn history_file_path(&self, index: i32) -> PathBuf {
-        self.root
-            .join(".fl")
-            .join("history")
-            .join(format!("{index:08}"))
+        self.history_path().join(format!("{index:08}.json"))
     }
 
     /// returns a valid commit index
@@ -470,7 +503,6 @@ impl FL {
         fl.set_hash_directory(true); // track directories
         fl.set_relative_to(&self.root); // output everything relative to the root, so that this works even if root folder is moved
         fl.set_use_progress_bar(true); // show progress bar, so that user knows how much to wait
-        fl.set_force(true); // replace output file if it already exists
         fl
     }
 }
