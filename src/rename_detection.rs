@@ -1,3 +1,5 @@
+use pathfinding::prelude::*;
+
 /// Find the globally optimal pairing between `old_paths` and `new_paths`,
 /// minimizing total [`path_distance`].
 ///
@@ -6,6 +8,14 @@ pub fn optimal_pairings<'a>(
     old_paths: &[&'a str],
     new_paths: &[&'a str],
 ) -> Vec<(&'a str, &'a str)> {
+    // Matrix will panic if its empty
+    if old_paths.is_empty() || new_paths.is_empty() {
+        return Vec::new();
+    }
+
+    // if there are more rows than columns, flip the matrix since this is required by the hungarian algorithm
+    let flip = old_paths.len() > new_paths.len();
+
     // build up the cost matrix
     // basically it is just a grid where rows are new paths and columns are deleted paths
     // and every cell in there is the distance between the two
@@ -15,20 +25,36 @@ pub fn optimal_pairings<'a>(
     // | old     |  3  |  3  |   4   |
     // | there   |  4  |  2  |   5   |
 
-    let costs: Vec<usize> = old_paths
-        .iter()
-        .flat_map(|n| new_paths.iter().map(|d| path_distance(n, d)))
-        .collect();
+    let costs = if !flip {
+        Matrix::from_rows(
+            old_paths
+                .iter()
+                .map(|old| new_paths.iter().map(|new| path_distance(old, new) as i32)),
+        )
+        .unwrap()
+    } else {
+        Matrix::from_rows(
+            new_paths
+                .iter()
+                .map(|new| old_paths.iter().map(|old| path_distance(new, old) as i32)),
+        )
+        .unwrap()
+    };
 
     // hungarian algorithm will pair every row with every column once, in a way to minimize the total cost
     // so `old -> new` and `the -> there`, and `troll` is left out, making the total cost `5`
-    hungarian::minimize(&costs, old_paths.len(), new_paths.len())
+    let (_cost, assignments) = kuhn_munkres_min(&costs);
+    assignments
         .into_iter()
         .enumerate()
-        // convert (usize, Option<usize>) to (usize, usize)
-        .filter_map(|(old, maybe_new)| maybe_new.map(|new| (old, new)))
-        // convert the indexes (usize, usize) to (new_path, deleted_path)
-        .map(|(old, new)| (old_paths[old], new_paths[new]))
+        // convert the indexes (i32, i32) to (new_path, deleted_path)
+        .map(|(r, c)| {
+            if !flip {
+                (old_paths[r], new_paths[c])
+            } else {
+                (old_paths[c], new_paths[r])
+            }
+        })
         .collect()
 }
 
@@ -67,20 +93,21 @@ mod tests {
     fn test_hungarian() {
         // I know that these "path_differences" have to be multiplied by 3, but for simplicity this is good enough
         #[rustfmt::skip]
-        let costs = [
-            3, 3, 4,
-            4, 2, 5,
-        ];
+        let costs = Matrix::from_rows([
+            [3, 3, 4],
+            [4, 2, 5],
+        ]).unwrap();
 
         // match 0 (index) to Some(0) ()
         assert_eq!(
-            hungarian::minimize(&costs, 2, 3),
-            vec![
-                // [0] in this vec, so column[0] is paired with row[0]
-                Some(0),
-                // [1], so column[1] is paired with row[1]
-                Some(1)
-            ]
+            kuhn_munkres_min(&costs),
+            (
+                5,
+                vec![
+                    0, // [0] in this vec, so column[0] is paired with row[0]
+                    1, // [1], so column[1] is paired with row[1]
+                ]
+            )
         );
     }
 
@@ -93,5 +120,10 @@ mod tests {
         assert_eq!(path_distance("there", "new"), 4 * 3);
         assert_eq!(path_distance("there", "the"), 2 * 3);
         assert_eq!(path_distance("there", "poppy"), 5 * 3);
+    }
+
+    #[test]
+    fn test_optimal_pairings_empty() {
+        assert_eq!(optimal_pairings(&[], &["dont", "panic"]), vec![]);
     }
 }

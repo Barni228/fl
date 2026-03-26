@@ -7,6 +7,7 @@
 - [ ] Add something like `log`, which prints the history with their messages
 - [ ] Add a way to edit commit history
 - [ ] Make commits have a date and time
+- [ ] maybe store commit files in some known format like `json`, `toml`, or `yaml`
 
 ## Bugs / Improvements
 
@@ -17,6 +18,7 @@
 
 ## Done
 
+- [x] use [PathFinding](https://github.com/samueltardieu/pathfinding) instead of hungarian crate
 - [x] Add something like `pwd`, that prints current repo path
 - [x] Allow commit messages
 - [x] When committing, print how many changes are committed (like `Committing 5 changes`)
