@@ -1,5 +1,6 @@
 [package]
 name = "fl"
+description = "A git-like way to track changes made to HUGE files, using hashes"
 version = "0.1.0"
 edition = "2024"
 
@@ -11,3 +12,4 @@ pathfinding = "4.15.0"
 serde = { version = "1.0.228", features = ["serde_derive"] }
 serde_json = "1.0.149"
 strsim = "0.11.1"
+time = { version = "0.3.47", features = ["serde-human-readable"] }

@@ -5,7 +5,6 @@
 - [ ] maybe create a `fix` command that fixes invalid `.fl/` folder
 - [ ] Add `add` and `remove` (`rm`) commands that will add/remove files from STAGE
 - [ ] Add a way to edit commit history
-- [ ] Make commits have a date and time
 - [ ] Allow commits to have body text
 - [ ] Improve `filelist` so it can return `BTreeMap` directory, instead of parsing strings
 
@@ -19,6 +18,7 @@
 
 ## Done
 
+- [x] Make commits have a date and time
 - [x] maybe store commit files in some known format like `json`, `toml`, or `yaml`
 - [x] Add something like `log`, which prints the history with their messages
 - [x] use [PathFinding](https://github.com/samueltardieu/pathfinding) instead of hungarian crate

@@ -213,7 +213,8 @@ impl FL {
 
     /// Commit the STAGE file, without a commit message
     pub fn commit_empty(&mut self) {
-        let stage = Commit::from_path(self.stage_path());
+        let mut stage = Commit::from_path(self.stage_path());
+        stage.set_timestamp_now();
         self.commit_commit(&stage);
     }
 
@@ -221,6 +222,7 @@ impl FL {
         let mut stage = Commit::from_path(self.stage_path());
         stage.title = Some(title);
         stage.body = Some(body);
+        stage.set_timestamp_now();
         self.commit_commit(&stage);
     }
 
@@ -228,7 +230,8 @@ impl FL {
         // TODO: these should be config options
         let print_title = true;
         let print_title_quotes = false;
-        let print_number_of_changes = true;
+        let print_number_of_changes = false;
+        let print_time_ago = true;
 
         for i in 0..self.commits {
             let path = self.history_file_path(i);
@@ -254,10 +257,15 @@ impl FL {
                     let num_changes = FL::diff_commit(&prev_commit, &commit).len();
                     format!(" ({num_changes} Changes)")
                 }
-                false => String::new(),
+                false => "".to_string(),
             };
 
-            println!("{i}: {title_quotes}{title}{title_quotes}{changes}");
+            let time_ago = match print_time_ago {
+                true => format!(" ({})", commit.time_ago()),
+                false => "".to_string(),
+            };
+
+            println!("{i}: {title_quotes}{title}{title_quotes}{changes}{time_ago}");
         }
     }
 }
