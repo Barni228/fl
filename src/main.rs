@@ -12,6 +12,16 @@ fn main() {
         Some(("update", _)) => {
             FL::in_current_dir().update();
         }
+        Some(("status", _)) => {
+            let mut fl = FL::in_current_dir();
+            if auto_update {
+                fl.update();
+            }
+            // Don't print dir changes, because it will print the files that got changed anyway
+            // This will make it feel more like `git status`
+            fl.ignore_dir_modifications = true;
+            fl.diff_stage(-1);
+        }
         Some(("diff", sub)) => {
             let fl = FL::in_current_dir();
             if auto_update {
@@ -65,6 +75,10 @@ fn get_clap_cmd() -> Command {
             Command::new("update")
                 .about("Update the repo, so all new changes are tracked")
                 .alias("u"),
+            Command::new("status")
+                .about("Print changes to files compared to last commit")
+                .alias("s")
+                .alias("st"),
             Command::new("diff")
                 .about("Print what has changed between 2 commits")
                 .alias("d")

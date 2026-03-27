@@ -81,6 +81,9 @@ pub struct FL {
     root: PathBuf,
     /// number of commits, last commit is `commits - 1`
     commits: i32,
+    // TODO: make this part of `config` field, when i will implement config fields
+    /// if true, add `diff` commands will ignore modifications on directories
+    pub ignore_dir_modifications: bool,
 }
 
 // Constructors
@@ -97,7 +100,11 @@ impl FL {
     /// # Panics
     /// May panic if filesystem helpers fail internally.
     pub fn new(root: PathBuf) -> Self {
-        let mut fl = FL { root, commits: 0 };
+        let mut fl = FL {
+            root,
+            commits: 0,
+            ignore_dir_modifications: false,
+        };
         fl.update_commits();
         fl
     }
@@ -190,12 +197,25 @@ impl FL {
         let second = max(valid_a, valid_b);
 
         println!("Diffing {first} and {second}");
-        FL::diff_paths(
+        self.diff_paths(
             &self.history_file_path(first),
             &self.history_file_path(second),
         );
     }
 
+    /// Compares the current staged snapshot (`STAGE.json`) with a commit.
+    ///
+    /// # Arguments
+    /// * `commit` - Index of the commit to compare against.
+    ///
+    /// Special cases:
+    /// * If there are no commits and `commit` is `-1` or `0`, the stage is diffed against an empty snapshot.
+    ///
+    /// Output format:
+    /// * `A` - Added file
+    /// * `D` - Deleted file
+    /// * `M` - Modified file
+    /// * `R` - Renamed/moved file
     pub fn diff_stage(&self, commit: i32) {
         let stage = Commit::from_path(self.stage_path());
         // if there are no commits, if user gave -1 or 0, diff against empty commit
@@ -208,7 +228,7 @@ impl FL {
             Commit::from_path(self.history_file_path(valid_commit))
         };
         let actions = FL::diff_commit(&target_commit, &stage);
-        FL::print_actions(&actions);
+        self.print_actions(&actions);
     }
 
     /// Commit the STAGE file, without a commit message
@@ -343,20 +363,26 @@ impl FL {
         self.commits += 1;
     }
 
-    fn diff_paths(old: &Path, new: &Path) {
+    fn diff_paths(&self, old: &Path, new: &Path) {
         let old = Commit::from_path(old);
         let new = Commit::from_path(new);
         let actions = FL::diff_commit(&old, &new);
-        FL::print_actions(&actions);
+        self.print_actions(&actions);
     }
 
-    fn print_actions(actions: &[Action]) {
+    fn print_actions(&self, actions: &[Action]) {
         if actions.is_empty() {
             println!("No changes");
             return;
         }
 
         for action in actions {
+            if self.ignore_dir_modifications
+                && let Action::Modify(path) = action
+                && PathBuf::from(path).is_dir()
+            {
+                continue;
+            }
             println!("{}", action.colored());
         }
     }

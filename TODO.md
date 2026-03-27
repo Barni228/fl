@@ -7,6 +7,7 @@
 - [ ] Add a way to edit commit history
 - [ ] Allow commits to have body text
 - [ ] Improve `filelist` so it can return `BTreeMap` directory, instead of parsing strings
+- [ ] Add `show` command which shows what a specific commit did
 
 ## Bugs / Improvements
 
