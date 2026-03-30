@@ -5,8 +5,27 @@ use std::fs;
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
-fn hm<'a>(pairs: impl IntoIterator<Item = (&'a str, &'a str)>) -> HashMap<&'a str, &'a str> {
-    pairs.into_iter().collect()
+fn hm<'a>(pairs: impl IntoIterator<Item = (&'a str, &'a str)>) -> HashMap<&'a Path, &'a str> {
+    pairs
+        .into_iter()
+        .map(|(path, hash)| (Path::new(path), hash))
+        .collect()
+}
+
+fn add(path: &'_ str) -> Action<'_> {
+    Action::Add(Path::new(path))
+}
+
+fn remove(path: &'_ str) -> Action<'_> {
+    Action::Remove(Path::new(path))
+}
+
+fn modify(path: &'_ str) -> Action<'_> {
+    Action::Modify(Path::new(path))
+}
+
+fn rename<'a>(from: &'a str, to: &'a str) -> Action<'a> {
+    Action::Rename(Path::new(from), Path::new(to))
 }
 
 // ─── Add ──────────────────────────────────────────────────────────────────────
@@ -17,14 +36,14 @@ fn test_diff_add_to_empty() {
     // usually hash should be 64 random characters, but really it can be any string, so i use "0" for simplicity
     let before = HashMap::new();
     let after = hm([("new", "0")]);
-    assert_eq!(FL::diff_map(&before, &after), vec![Action::Add("new")]);
+    assert_eq!(FL::diff_map(&before, &after), vec![add("new")]);
 }
 
 #[test]
 fn test_diff_add() {
     let before = hm([("old", "0")]);
     let after = hm([("old", "0"), ("new", "1")]);
-    assert_eq!(FL::diff_map(&before, &after), vec![Action::Add("new")]);
+    assert_eq!(FL::diff_map(&before, &after), vec![add("new")]);
 }
 
 #[test]
@@ -33,7 +52,7 @@ fn test_diff_add_multiple() {
     let after = hm([("a", "1"), ("b", "2"), ("c", "3")]);
     assert_eq!(
         FL::diff_map(&before, &after),
-        vec![Action::Add("a"), Action::Add("b"), Action::Add("c")]
+        vec![add("a"), add("b"), add("c")]
     );
 }
 
@@ -43,7 +62,7 @@ fn test_diff_add_multiple() {
 fn test_diff_remove_single() {
     let before = hm([("old", "0")]);
     let after = HashMap::new();
-    assert_eq!(FL::diff_map(&before, &after), vec![Action::Remove("old")]);
+    assert_eq!(FL::diff_map(&before, &after), vec![remove("old")]);
 }
 
 #[test]
@@ -52,11 +71,7 @@ fn test_diff_remove_multiple() {
     let after = HashMap::new();
     assert_eq!(
         FL::diff_map(&before, &after),
-        vec![
-            Action::Remove("a"),
-            Action::Remove("b"),
-            Action::Remove("c")
-        ]
+        vec![remove("a"), remove("b"), remove("c")]
     );
 }
 
@@ -64,7 +79,7 @@ fn test_diff_remove_multiple() {
 fn test_diff_remove_and_unchanged() {
     let before = hm([("keep", "0"), ("gone", "1")]);
     let after = hm([("keep", "0")]);
-    assert_eq!(FL::diff_map(&before, &after), vec![Action::Remove("gone")]);
+    assert_eq!(FL::diff_map(&before, &after), vec![remove("gone")]);
 }
 
 // ─── Modify ───────────────────────────────────────────────────────────────────
@@ -73,7 +88,7 @@ fn test_diff_remove_and_unchanged() {
 fn test_diff_modify_single() {
     let before = hm([("file", "aaa")]);
     let after = hm([("file", "bbb")]);
-    assert_eq!(FL::diff_map(&before, &after), vec![Action::Modify("file")]);
+    assert_eq!(FL::diff_map(&before, &after), vec![modify("file")]);
 }
 
 #[test]
@@ -82,7 +97,7 @@ fn test_diff_modify_multiple() {
     let after = hm([("a", "X"), ("b", "Y")]);
     assert_eq!(
         FL::diff_map(&before, &after),
-        vec![Action::Modify("a"), Action::Modify("b")]
+        vec![modify("a"), modify("b")]
     );
 }
 
@@ -90,10 +105,7 @@ fn test_diff_modify_multiple() {
 fn test_diff_modify_and_unchanged() {
     let before = hm([("changed", "old"), ("same", "0")]);
     let after = hm([("changed", "new"), ("same", "0")]);
-    assert_eq!(
-        FL::diff_map(&before, &after),
-        vec![Action::Modify("changed")]
-    );
+    assert_eq!(FL::diff_map(&before, &after), vec![modify("changed")]);
 }
 
 // ─── Rename ───────────────────────────────────────────────────────────────────
@@ -104,7 +116,7 @@ fn test_diff_rename_simple() {
     let after = hm([("new_name.txt", "abc")]);
     assert_eq!(
         FL::diff_map(&before, &after),
-        vec![Action::Rename("old_name.txt", "new_name.txt")]
+        vec![rename("old_name.txt", "new_name.txt")]
     );
 }
 
@@ -114,7 +126,7 @@ fn test_diff_move() {
     let after = hm([("subdir/file.txt", "abc")]);
     assert_eq!(
         FL::diff_map(&before, &after),
-        vec![Action::Rename("file.txt", "subdir/file.txt")]
+        vec![rename("file.txt", "subdir/file.txt")]
     );
 }
 
@@ -124,7 +136,7 @@ fn test_diff_rename_and_move() {
     let after = hm([("other/new.txt", "hash")]);
     assert_eq!(
         FL::diff_map(&before, &after),
-        vec![Action::Rename("dir/old.txt", "other/new.txt")]
+        vec![rename("dir/old.txt", "other/new.txt")]
     );
 }
 
@@ -136,8 +148,8 @@ fn test_diff_rename_best_match() {
     assert_eq!(
         FL::diff_map(&before, &after),
         vec![
-            Action::Rename("alpha.txt", "alpha_v2.txt"),
-            Action::Rename("beta.txt", "gamma.txt")
+            rename("alpha.txt", "alpha_v2.txt"),
+            rename("beta.txt", "gamma.txt"),
         ]
     );
 }
@@ -172,16 +184,16 @@ fn test_diff_rename_best_many() {
     assert_eq!(
         FL::diff_map(&before, &after),
         vec![
-            Action::Rename("eight", "Eight.txt"),
-            Action::Rename("five", "Five.txt"),
-            Action::Rename("four", "Four.txt"),
-            Action::Rename("nine", "Nine.txt"),
-            Action::Rename("one", "One.txt"),
-            Action::Rename("seven", "Seven.txt"),
-            Action::Rename("six", "Six.txt"),
-            Action::Rename("ten", "Ten.txt"),
-            Action::Rename("three", "Three.txt"),
-            Action::Rename("two", "Two.txt"),
+            rename("eight", "Eight.txt"),
+            rename("five", "Five.txt"),
+            rename("four", "Four.txt"),
+            rename("nine", "Nine.txt"),
+            rename("one", "One.txt"),
+            rename("seven", "Seven.txt"),
+            rename("six", "Six.txt"),
+            rename("ten", "Ten.txt"),
+            rename("three", "Three.txt"),
+            rename("two", "Two.txt"),
         ]
     );
 }
@@ -215,7 +227,7 @@ fn test_diff_rename_while_modifying() {
     let after = hm([("b.txt", "HASH_B")]);
     assert_eq!(
         FL::diff_map(&before, &after),
-        vec![Action::Remove("a.txt"), Action::Add("b.txt")]
+        vec![remove("a.txt"), add("b.txt")]
     );
 }
 
@@ -226,10 +238,7 @@ fn test_diff_rename_different_files() {
     let after = hm([("c.txt", "HASH_A"), ("d.txt", "HASH_B")]);
     assert_eq!(
         FL::diff_map(&before, &after),
-        vec![
-            Action::Rename("a.txt", "c.txt"),
-            Action::Rename("b.txt", "d.txt")
-        ]
+        vec![rename("a.txt", "c.txt"), rename("b.txt", "d.txt")]
     );
 }
 
@@ -240,8 +249,8 @@ fn test_diff_rename_different_dir() {
     assert_eq!(
         FL::diff_map(&before, &after),
         vec![
-            Action::Rename("src/gadget.rs", "lib/gadget.rs"),
-            Action::Rename("src/widget.rs", "src/widget_v2.rs")
+            rename("src/gadget.rs", "lib/gadget.rs"),
+            rename("src/widget.rs", "src/widget_v2.rs"),
         ]
     );
 }
@@ -266,10 +275,10 @@ fn test_diff_all() {
     assert_eq!(
         FL::diff_map(&before, &after),
         vec![
-            Action::Modify("change.txt"),
-            Action::Remove("gone.txt"),
-            Action::Rename("renamed.txt", "new-name.txt"),
-            Action::Add("new.txt"),
+            modify("change.txt"),
+            remove("gone.txt"),
+            rename("renamed.txt", "new-name.txt"),
+            add("new.txt"),
         ]
     );
 }
@@ -279,18 +288,15 @@ fn test_diff_modify() {
     // Same path, different hash → Modify, not Rename
     let before = hm([("file.txt", "old_hash")]);
     let after = hm([("file.txt", "new_hash")]);
-    assert_eq!(
-        FL::diff_map(&before, &after),
-        vec![Action::Modify("file.txt")]
-    );
+    assert_eq!(FL::diff_map(&before, &after), vec![modify("file.txt")]);
 }
 
 // ─── empty ───────────────────────────────────────────────────────────────────
 
 #[test]
 fn test_diff_both_empty() {
-    let before: HashMap<&str, &str> = HashMap::new();
-    let after: HashMap<&str, &str> = HashMap::new();
+    let before = hm([]);
+    let after = hm([]);
     assert!(FL::diff_map(&before, &after).is_empty());
 }
 
@@ -311,9 +317,9 @@ fn test_diff_output_is_sorted() {
     assert_eq!(
         FL::diff_map(&before, &after),
         vec![
-            Action::Modify("a_change.txt"),
-            Action::Add("m_new.txt"),
-            Action::Remove("z_gone.txt")
+            modify("a_change.txt"),
+            add("m_new.txt"),
+            remove("z_gone.txt")
         ]
     );
 }
@@ -372,8 +378,9 @@ fn test_update() {
         json!({
             "title": null,
             "body": null,
+            "timestamp": null,
             "snapshot": {
-                "./": "7f39224e335994886c26ba8c241fcbe1d474aadaa2bd0a8e842983b098cea894",
+                ".": "7f39224e335994886c26ba8c241fcbe1d474aadaa2bd0a8e842983b098cea894",
                 "file.txt": "5891b5b522d5df086d0ff0b110fbd9d21bb4fc7163af34d08286a2e846f6be03",
             },
         })

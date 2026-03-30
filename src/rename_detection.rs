@@ -1,13 +1,14 @@
 use pathfinding::prelude::*;
+use std::path::Path;
 
 /// Find the globally optimal pairing between `old_paths` and `new_paths`,
 /// minimizing total [`path_distance`].
 ///
 /// Returns a list of `(old_path, new_path)` pairs
 pub fn optimal_pairings<'a>(
-    old_paths: &[&'a str],
-    new_paths: &[&'a str],
-) -> Vec<(&'a str, &'a str)> {
+    old_paths: &[&'a Path],
+    new_paths: &[&'a Path],
+) -> Vec<(&'a Path, &'a Path)> {
     // Matrix will panic if its empty
     if old_paths.is_empty() || new_paths.is_empty() {
         return Vec::new();
@@ -64,9 +65,12 @@ pub fn optimal_pairings<'a>(
 /// 0 = exactly the same
 /// It values file name changes more than directory changes
 /// So `foo -> src/foo` is less than `foo -> bob`
-pub fn path_distance(a: &str, b: &str) -> usize {
-    let (a_dir, a_name) = a.rsplit_once('/').unwrap_or(("", a));
-    let (b_dir, b_name) = b.rsplit_once('/').unwrap_or(("", b));
+pub fn path_distance(a: &Path, b: &Path) -> usize {
+    let a_name = a.file_name().and_then(|s| s.to_str()).unwrap_or("");
+    let b_name = b.file_name().and_then(|s| s.to_str()).unwrap_or("");
+
+    let a_dir = a.parent().and_then(|p| p.to_str()).unwrap_or("");
+    let b_dir = b.parent().and_then(|p| p.to_str()).unwrap_or("");
 
     let name_dist = strsim::damerau_levenshtein(a_name, b_name);
     let dir_dist = strsim::damerau_levenshtein(a_dir, b_dir);
@@ -81,11 +85,14 @@ mod tests {
     // this is mainly to make sure the comment in `path_distance` is correct
     #[test]
     fn test_optimal_pairings() {
-        let old_paths = ["old", "there"];
-        let new_paths = ["new", "the", "poppy"];
+        let old_paths = [Path::new("old"), Path::new("there")];
+        let new_paths = [Path::new("new"), Path::new("the"), Path::new("poppy")];
         assert_eq!(
             optimal_pairings(&old_paths, &new_paths),
-            vec![("old", "new"), ("there", "the")]
+            vec![
+                (Path::new("old"), Path::new("new")),
+                (Path::new("there"), Path::new("the"))
+            ]
         );
     }
 
@@ -113,17 +120,20 @@ mod tests {
 
     #[test]
     fn test_path_difference() {
-        assert_eq!(path_distance("old", "new"), 3 * 3);
-        assert_eq!(path_distance("old", "the"), 3 * 3);
-        assert_eq!(path_distance("old", "poppy"), 4 * 3);
+        assert_eq!(path_distance(Path::new("old"), Path::new("new")), 3 * 3);
+        assert_eq!(path_distance(Path::new("old"), Path::new("the")), 3 * 3);
+        assert_eq!(path_distance(Path::new("old"), Path::new("poppy")), 4 * 3);
 
-        assert_eq!(path_distance("there", "new"), 4 * 3);
-        assert_eq!(path_distance("there", "the"), 2 * 3);
-        assert_eq!(path_distance("there", "poppy"), 5 * 3);
+        assert_eq!(path_distance(Path::new("there"), Path::new("new")), 4 * 3);
+        assert_eq!(path_distance(Path::new("there"), Path::new("the")), 2 * 3);
+        assert_eq!(path_distance(Path::new("there"), Path::new("poppy")), 5 * 3);
     }
 
     #[test]
     fn test_optimal_pairings_empty() {
-        assert_eq!(optimal_pairings(&[], &["dont", "panic"]), vec![]);
+        assert_eq!(
+            optimal_pairings(&[], &[Path::new("dont"), Path::new("panic")]),
+            vec![]
+        );
     }
 }

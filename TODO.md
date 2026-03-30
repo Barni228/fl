@@ -6,8 +6,8 @@
 - [ ] Add `add` and `remove` (`rm`) commands that will add/remove files from STAGE
 - [ ] Add a way to edit commit history
 - [ ] Allow commits to have body text
-- [ ] Improve `filelist` so it can return `BTreeMap` directory, instead of parsing strings
 - [ ] Add `show` command which shows what a specific commit did
+- [ ] Add `log --follow` command, that shows every commit that changed a specific file
 
 ## Bugs / Improvements
 
@@ -19,6 +19,7 @@
 
 ## Done
 
+- [x] Improve `filelist` so it can return `BTreeMap` directory, instead of parsing strings
 - [x] Make commits have a date and time
 - [x] maybe store commit files in some known format like `json`, `toml`, or `yaml`
 - [x] Add something like `log`, which prints the history with their messages

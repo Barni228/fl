@@ -1,15 +1,20 @@
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, path::Path};
+use std::{
+    collections::BTreeMap,
+    path::{Path, PathBuf},
+};
 use time::{Duration, OffsetDateTime};
 
 use crate::fs_helper;
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct Commit {
+    /// The title of the commit, should be short one line
     pub title: Option<String>,
+    /// If the title is not enough, this is a longer description, can be multi-line
     pub body: Option<String>,
     pub timestamp: Option<OffsetDateTime>,
-    pub snapshot: BTreeMap<String, String>,
+    pub snapshot: BTreeMap<PathBuf, String>,
 }
 
 impl Commit {

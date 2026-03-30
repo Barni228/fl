@@ -22,25 +22,30 @@ mod rename_detection;
 /// * `Rename` — the file was moved or renamed
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Action<'a> {
-    Add(&'a str),
-    Remove(&'a str),
-    Rename(&'a str, &'a str),
-    Modify(&'a str),
+    Add(&'a Path),
+    Remove(&'a Path),
+    Rename(&'a Path, &'a Path),
+    Modify(&'a Path),
 }
 
 impl<'a> Action<'a> {
     fn colored(&self) -> String {
         match self {
-            Action::Add(path) => format!("{}  {path}", "A".green()),
-            Action::Remove(path) => format!("{}  {path}", "D".red()),
-            Action::Modify(path) => format!("{}  {path}", "M".yellow()),
+            Action::Add(path) => format!("{A}  {path}", A = "A".green(), path = path.display()),
+            Action::Remove(path) => format!("{D}  {path}", D = "D".red(), path = path.display()),
+            Action::Modify(path) => format!("{M}  {path}", M = "M".yellow(), path = path.display()),
             Action::Rename(from, to) => {
-                format!(r#"{}  "{}" -> "{}""#, "R".magenta(), from.red(), to)
+                format!(
+                    r#"{R}  "{from}" -> "{to}""#,
+                    R = "R".blue(),
+                    from = from.display(),
+                    to = to.display()
+                )
             }
         }
     }
 
-    fn sort_key(&self) -> (&str, u8) {
+    fn sort_key(&self) -> (&Path, u8) {
         match self {
             Action::Add(p) => (p, 0),
             Action::Remove(p) => (p, 1),
@@ -53,11 +58,11 @@ impl<'a> Action<'a> {
 impl<'a> fmt::Display for Action<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Action::Add(path) => write!(f, "A  {path}"),
-            Action::Remove(path) => write!(f, "D  {path}"),
-            Action::Modify(path) => write!(f, "M  {path}"),
+            Action::Add(path) => write!(f, "A  {}", path.display()),
+            Action::Remove(path) => write!(f, "D  {}", path.display()),
+            Action::Modify(path) => write!(f, "M  {}", path.display()),
             Action::Rename(from, to) => {
-                write!(f, r#"R  "{from}" -> "{to}""#)
+                write!(f, r#"R  "{}" -> "{}""#, from.display(), to.display())
             }
         }
     }
@@ -169,10 +174,7 @@ impl FL {
         let output = self.stage_path();
         println!("Updating {}", self.root.display());
 
-        for line in fl.hash_paths(vec![self.root.clone()]) {
-            let (hash, path) = line.trim().split_once('\t').unwrap();
-            commit.snapshot.insert(path.to_string(), hash.to_string());
-        }
+        commit.snapshot = fl.hash_paths(&[&self.root]);
 
         commit.save_to(output);
     }
@@ -388,11 +390,11 @@ impl FL {
     }
 
     fn diff_commit<'a>(old: &'a Commit, new: &'a Commit) -> Vec<Action<'a>> {
-        // convert `BTreeMap<String, String>` to `HashMap<&str, &str>`
-        let old_by_path: HashMap<&str, &str> =
-            HashMap::from_iter(old.snapshot.iter().map(|(k, v)| (k.as_str(), v.as_str())));
-        let new_by_path: HashMap<&str, &str> =
-            HashMap::from_iter(new.snapshot.iter().map(|(k, v)| (k.as_str(), v.as_str())));
+        // convert `BTreeMap<PathBuf, String>` to `HashMap<&Path, &str>`
+        let old_by_path: HashMap<&Path, &str> =
+            HashMap::from_iter(old.snapshot.iter().map(|(k, v)| (k.as_path(), v.as_str())));
+        let new_by_path: HashMap<&Path, &str> =
+            HashMap::from_iter(new.snapshot.iter().map(|(k, v)| (k.as_path(), v.as_str())));
 
         FL::diff_map(&old_by_path, &new_by_path)
     }
@@ -406,12 +408,12 @@ impl FL {
     /// # Returns
     /// A sorted list of [`Action`] describing the differences.
     fn diff_map<'a>(
-        old: &HashMap<&'a str, &'a str>,
-        new: &HashMap<&'a str, &'a str>,
+        old: &HashMap<&'a Path, &'a str>,
+        new: &HashMap<&'a Path, &'a str>,
     ) -> Vec<Action<'a>> {
         // Paths that were deleted are stored here by hash, for rename detection.
         // only path that are missing come here, modifications never enter this map
-        let mut deleted_by_hash: HashMap<&str, Vec<&str>> = HashMap::new();
+        let mut deleted_by_hash: HashMap<&str, Vec<&Path>> = HashMap::new();
         let mut actions: Vec<Action> = Vec::new();
 
         for (path, old_hash) in old {
@@ -423,7 +425,7 @@ impl FL {
         }
 
         // A hash from `deleted_by_hash` as key, a list of new paths with that hash as value.
-        let mut rename_candidates: HashMap<&str, Vec<&str>> = HashMap::new();
+        let mut rename_candidates: HashMap<&str, Vec<&Path>> = HashMap::new();
 
         for (path, new_hash) in new {
             if old.contains_key(path) {
@@ -438,12 +440,7 @@ impl FL {
             }
         }
 
-        // Match each group of rename candidates against the pool of deleted paths
-        // that share the same hash. Within a group we want the globally optimal
-        // pairing (minimum total path-distance), not the greedy local optimum.
-        // Because real-world rename groups are tiny (almost always 1-to-1, rarely
-        // more than a handful), we use brute-force permutation search which is
-        // exact and fast enough in practice.
+        // Match each group of rename candidates against the pool of deleted paths that share the same hash.
         for (hash, mut new_paths) in rename_candidates {
             // unwrap: key is guaranteed to exist because we only inserted into
             // rename_candidates when deleted_by_hash contained the same hash.
@@ -532,9 +529,8 @@ impl FL {
     fn get_filelist(&self) -> FileList {
         let mut fl = FileList::new();
         fl.set_hash_length(64); // show 64 chars of hash, to minimize chance of collision
-        fl.set_sep('\t'); // use tab as separator
-        fl.set_all(false); // don't track hidden files
-        fl.set_hash_directory(true); // track directories
+        fl.hasher_mut().set_all(false); // don't track hidden files
+        fl.hasher_mut().set_hash_directory(true); // track directories
         fl.set_relative_to(&self.root); // output everything relative to the root, so that this works even if root folder is moved
         fl.set_use_progress_bar(true); // show progress bar, so that user knows how much to wait
         fl
