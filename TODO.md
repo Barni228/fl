@@ -8,18 +8,20 @@
 - [ ] Add `show` command which shows what a specific commit did
 - [ ] Add `log --follow` command, that shows every commit that changed a specific file
 - [ ] Add a way to filter commits, like `-ad` for only add or delete actions
+- [ ] Add a way to ignore files/folders, like `.gitignore`
 
 ## Bugs / Improvements
 
-- [ ] maybe remove dead code from `fs_helper.rs`
+- [ ] Use custom error types instead of `anyhow::Result`
 - [ ] Add more tests, to test things other than `diff`
 - [ ] maybe store history paths in hex numbers instead of regular numbers (`{:08x}`)
 - [ ] Don't panic when `.fl/` folder is invalid (does not contain `history/`, or has weird permissions)
-- [ ] Improve Error handling, so I return `Result` instead of always exiting with error
 - [ ] Add meaningful exit codes (instead of using raw_os_error)
 
 ## Done
 
+- [x] maybe remove dead code from `fs_helper.rs`
+- [x] Improve Error handling, so I return `Result` instead of always exiting with error
 - [x] Allow commits to have body text
 - [x] Improve `filelist` so it can return `BTreeMap` directory, instead of parsing strings
 - [x] Make commits have a date and time

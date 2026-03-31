@@ -1,11 +1,12 @@
+use anyhow::Context;
+use fs_err as fs;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
+    io,
     path::{Path, PathBuf},
 };
 use time::{Duration, OffsetDateTime};
-
-use crate::fs_helper;
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct Commit {
@@ -13,7 +14,9 @@ pub struct Commit {
     pub title: Option<String>,
     /// If the title is not enough, this is a longer description, can be multi-line
     pub body: Option<String>,
+    /// The timestamp of when the commit was created
     pub timestamp: Option<OffsetDateTime>,
+    /// The snapshot which maps all files/directories to their hashes
     pub snapshot: BTreeMap<PathBuf, String>,
 }
 
@@ -26,15 +29,21 @@ impl Commit {
     }
 
     /// Loads a commit from a file
-    pub fn from_path(path: impl AsRef<Path>) -> Self {
-        let content = fs_helper::read_to_string(&path);
-        serde_json::from_str(&content).unwrap()
+    pub fn from_path(path: impl AsRef<Path>) -> anyhow::Result<Self> {
+        let content = fs::read_to_string(&path)?;
+        let commit = serde_json::from_str::<Commit>(&content).with_context(|| {
+            format!(
+                "Failed to parse commit from json {}",
+                path.as_ref().display()
+            )
+        })?;
+        Ok(commit)
     }
 
     /// Save a commit to a file
-    pub fn save_to(&self, path: impl AsRef<Path>) {
+    pub fn save_to(&self, path: impl AsRef<Path>) -> io::Result<()> {
         let content = serde_json::to_string_pretty(self).unwrap();
-        fs_helper::write(&path, &content);
+        fs::write(path, content)
     }
 
     /// Sets the timestamp to the current time

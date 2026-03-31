@@ -1,5 +1,7 @@
+use anyhow::Context;
 use colored::Colorize;
 use filelist::FileList;
+use fs_err as fs;
 use std::{
     cmp::{max, min},
     collections::HashMap,
@@ -12,7 +14,6 @@ use std::{
 use crate::commit::Commit;
 
 pub mod commit;
-pub mod fs_helper;
 mod rename_detection;
 
 /// Represents a change detected between two file snapshots.
@@ -103,28 +104,23 @@ impl FL {
     ///
     /// # Arguments
     /// * `root` - Path to the directory containing the `.fl` folder.
-    ///
-    /// # Panics
-    /// May panic if filesystem helpers fail internally.
-    pub fn new(root: PathBuf) -> Self {
+    pub fn new(root: PathBuf) -> io::Result<FL> {
         let mut fl = FL {
             root,
             commits: 0,
             ignore_dir_modifications: false,
         };
-        fl.update_commits();
-        fl
+        fl.update_commits()?;
+        Ok(fl)
     }
 
     /// Creates a new `FL` instance by locating a `.fl` repository
     /// starting from the current directory and walking up parent directories.
     ///
     /// This is similar to how tools like Git locate repositories.
-    ///
-    /// # Panics
-    /// May panic if no `.fl` directory is found or filesystem helpers fail.
-    pub fn in_current_dir() -> Self {
-        FL::new(fs_helper::find_root_path())
+    pub fn in_current_dir() -> anyhow::Result<FL> {
+        let fl = FL::new(FL::find_root_path()?)?;
+        Ok(fl)
     }
 
     /// Initializes a new `.fl` repository at the given path.
@@ -134,10 +130,10 @@ impl FL {
     ///
     /// # Arguments
     /// * `root` - Directory where the repository should be created.
-    pub fn create_fl_repo(root: PathBuf) -> Self {
-        fs_helper::create_dir(root.join(".fl"));
-        fs_helper::create_dir(root.join(".fl").join("history"));
-        Commit::default().save_to(root.join(".fl").join("STAGE.json"));
+    pub fn create_fl_repo(root: PathBuf) -> io::Result<FL> {
+        fs::create_dir(root.join(".fl"))?;
+        fs::create_dir(root.join(".fl").join("history"))?;
+        Commit::default().save_to(root.join(".fl").join("STAGE.json"))?;
 
         FL::new(root)
     }
@@ -145,8 +141,8 @@ impl FL {
     /// Initializes a new `.fl` repository in the current working directory.
     ///
     /// This is a convenience wrapper around [`FL::create_fl_repo`].
-    pub fn init() -> Self {
-        FL::create_fl_repo(fs_helper::current_dir())
+    pub fn init() -> io::Result<FL> {
+        FL::create_fl_repo(env::current_dir()?)
     }
 }
 
@@ -167,10 +163,7 @@ impl FL {
     ///
     /// This generates a file list for the root directory and writes it
     /// to a new history file with the next commit index.
-    ///
-    /// # Panics
-    /// Panics if file listing fails.
-    pub fn update(&self) {
+    pub fn update(&self) -> io::Result<()> {
         let mut fl = self.get_filelist();
         let mut commit = commit::Commit::default();
         let output = self.stage_path();
@@ -178,7 +171,7 @@ impl FL {
 
         commit.snapshot = fl.hash_paths(&[&self.root]);
 
-        commit.save_to(output);
+        commit.save_to(output)
     }
 
     /// Compares two history snapshots and prints their differences.
@@ -192,7 +185,7 @@ impl FL {
     /// * `D` - Deleted file
     /// * `M` - Modified file
     /// * `R` - Renamed/moved file
-    pub fn diff_history(&self, a: i32, b: i32) {
+    pub fn diff_history(&self, a: i32, b: i32) -> anyhow::Result<()> {
         let valid_a = self.to_valid_history_index(a);
         let valid_b = self.to_valid_history_index(b);
 
@@ -204,7 +197,7 @@ impl FL {
         self.diff_paths(
             &self.history_file_path(first),
             &self.history_file_path(second),
-        );
+        )
     }
 
     /// Compares the current staged snapshot (`STAGE.json`) with a commit.
@@ -220,8 +213,8 @@ impl FL {
     /// * `D` - Deleted file
     /// * `M` - Modified file
     /// * `R` - Renamed/moved file
-    pub fn diff_stage(&self, commit: i32) {
-        let stage = Commit::from_path(self.stage_path());
+    pub fn diff_stage(&self, commit: i32) -> anyhow::Result<()> {
+        let stage = Commit::from_path(self.stage_path())?;
         // if there are no commits, if user gave -1 or 0, diff against empty commit
         let target_commit = if self.commits == 0 && [-1, 0].contains(&commit) {
             println!("Diffing EMPTY and STAGE");
@@ -229,37 +222,42 @@ impl FL {
         } else {
             let valid_commit = self.to_valid_history_index(commit);
             println!("Diffing {valid_commit} and STAGE");
-            Commit::from_path(self.history_file_path(valid_commit))
+            Commit::from_path(self.history_file_path(valid_commit))?
         };
         let actions = FL::diff_commit(&target_commit, &stage);
         self.print_actions(&actions);
+        Ok(())
     }
 
     /// Commit the STAGE file, without a commit message
-    pub fn commit_empty(&mut self) {
-        let mut stage = Commit::from_path(self.stage_path());
+    pub fn commit_empty(&mut self) -> anyhow::Result<()> {
+        let mut stage = Commit::from_path(self.stage_path())?;
         stage.set_timestamp_now();
-        self.commit_commit(&stage);
+        self.commit_commit(&stage)
     }
 
-    pub fn commit_message(&mut self, message: &str) {
+    /// Commit the STAGE file, with a commit message
+    /// First line of the message will be used as the title, the rest as the body
+    pub fn commit_message(&mut self, message: &str) -> anyhow::Result<()> {
         let (title, body) = message
             .split_once('\n')
             .map(|(t, b)| (t.trim_end(), b.trim()))
             .unwrap_or((message, ""));
 
-        self.commit_title_body(title.to_string(), body.to_string());
+        self.commit_title_body(title.to_string(), body.to_string())
     }
 
-    pub fn commit_title_body(&mut self, title: String, body: String) {
-        let mut stage = Commit::from_path(self.stage_path());
+    /// Commit the STAGE file, with a title and body
+    pub fn commit_title_body(&mut self, title: String, body: String) -> anyhow::Result<()> {
+        let mut stage = Commit::from_path(self.stage_path())?;
         stage.title = Some(title);
         stage.body = Some(body);
         stage.set_timestamp_now();
-        self.commit_commit(&stage);
+        self.commit_commit(&stage)
     }
 
-    pub fn commit_interactive(&mut self) {
+    /// Commit the STAGE file, but open an editor to write a commit message
+    pub fn commit_interactive(&mut self) -> anyhow::Result<()> {
         // these should also be config options
         let ask_confirmation = true;
         let editor = env::var("EDITOR").unwrap_or_else(|_| "vim".to_string());
@@ -267,20 +265,21 @@ impl FL {
         let mut path = env::temp_dir();
         path.push("FL_COMMIT_MESSAGE");
 
-        fs_helper::write(
+        fs::write(
             &path,
             "# Write your commit message. Lines starting with '#' will be ignored.",
-        );
+        )?;
 
         let status = process::Command::new(editor)
             .arg(&path)
             .status()
-            .expect("Failed to open editor");
+            .context("Failed to open editor")?;
 
-        if !status.success() {
-            eprintln!("Editor exited with error");
-            return;
-        }
+        // if !status.success() {
+        //     anyhow::bail!("Editor exited with error");
+        // }
+        // same as above
+        anyhow::ensure!(status.success(), "Editor exited with error");
 
         if ask_confirmation {
             print!("Press enter to commit: ");
@@ -288,9 +287,9 @@ impl FL {
             io::stdin().read_line(&mut String::new()).unwrap();
         }
 
-        let content = fs_helper::read_to_string(&path);
+        let content = fs::read_to_string(&path)?;
 
-        let _ = std::fs::remove_file(&path);
+        let _ = fs::remove_file(&path);
 
         let cleaned = content
             .lines()
@@ -302,13 +301,13 @@ impl FL {
             .to_string();
 
         if cleaned.is_empty() {
-            self.commit_empty();
+            self.commit_empty()
         } else {
-            self.commit_message(&cleaned);
+            self.commit_message(&cleaned)
         }
     }
 
-    pub fn print_short_log(&self) {
+    pub fn print_short_log(&self) -> anyhow::Result<()> {
         // TODO: these should be config options
         let print_title = true;
         let print_title_quotes = false;
@@ -317,7 +316,7 @@ impl FL {
 
         for i in 0..self.commits {
             let path = self.history_file_path(i);
-            let commit = Commit::from_path(&path);
+            let commit = Commit::from_path(&path)?;
 
             let title = match print_title {
                 true => commit.title.as_deref().unwrap_or("No commit message"),
@@ -332,7 +331,7 @@ impl FL {
             let changes = match print_number_of_changes {
                 true => {
                     let prev_commit = if i > 0 {
-                        Commit::from_path(self.history_file_path(i - 1))
+                        Commit::from_path(self.history_file_path(i - 1))?
                     } else {
                         Commit::default()
                     };
@@ -349,6 +348,8 @@ impl FL {
 
             println!("{i}: {title_quotes}{title}{title_quotes}{changes}{time_ago}");
         }
+
+        Ok(())
     }
 }
 
@@ -360,10 +361,10 @@ impl FL {
     /// and sets `self.commits` to the next available index.
     ///
     /// Invalid filenames are ignored with a warning.
-    fn update_commits(&mut self) {
+    fn update_commits(&mut self) -> io::Result<()> {
         let history_path = self.history_path();
 
-        let commits = fs_helper::read_dir(&history_path)
+        let commits = fs::read_dir(&history_path)?
             .filter_map(Result::ok) // ignore read errors
             // convert file name to string
             .filter_map(|e| {
@@ -395,9 +396,11 @@ impl FL {
             .map_or(0, |n| n + 1);
 
         self.commits = commits as i32;
+
+        Ok(())
     }
 
-    fn warn_invalid_history(&self, path: impl std::fmt::Display) {
+    fn warn_invalid_history(&self, path: impl fmt::Display) {
         eprintln!(
             "{}: invalid history file name: '{}' ({})",
             "WARNING".yellow(),
@@ -407,12 +410,12 @@ impl FL {
     }
 
     /// This will commit a [`commit::Commit`] object
-    fn commit_commit(&mut self, commit: &Commit) {
+    fn commit_commit(&mut self, commit: &Commit) -> anyhow::Result<()> {
         let out_path = self.history_file_path(self.commits);
 
         // if there is a previous commit, diff against it
         let prev_commit = if self.commits > 0 {
-            Commit::from_path(self.history_file_path(self.commits - 1))
+            Commit::from_path(self.history_file_path(self.commits - 1))?
         } else {
             Commit::default()
         };
@@ -420,15 +423,17 @@ impl FL {
         let changes = FL::diff_commit(&prev_commit, commit).len();
         println!("Committing {} changes", changes);
 
-        commit.save_to(out_path);
+        commit.save_to(out_path)?;
         self.commits += 1;
+        Ok(())
     }
 
-    fn diff_paths(&self, old: &Path, new: &Path) {
-        let old = Commit::from_path(old);
-        let new = Commit::from_path(new);
+    fn diff_paths(&self, old: &Path, new: &Path) -> anyhow::Result<()> {
+        let old = Commit::from_path(old)?;
+        let new = Commit::from_path(new)?;
         let actions = FL::diff_commit(&old, &new);
         self.print_actions(&actions);
+        Ok(())
     }
 
     fn print_actions(&self, actions: &[Action]) {
@@ -579,7 +584,28 @@ impl FL {
                     -self.commits,
                     self.commits - 1
                 );
-                std::process::exit(2);
+                process::exit(2);
+            }
+        }
+    }
+
+    fn find_root_path() -> anyhow::Result<PathBuf> {
+        let dir = env::current_dir().context("Failed to get current directory")?;
+
+        FL::find_fl_path(dir)
+            .context("fatal: not inside an fl repository (or any of the parent directories)")
+    }
+
+    fn find_fl_path(mut dir: PathBuf) -> Option<PathBuf> {
+        loop {
+            // if dir contains `.fl` folder, return it
+            if dir.join(".fl").is_dir() {
+                return Some(dir);
+            }
+
+            // go one level up, or if there are no more parents then return None
+            if !dir.pop() {
+                return None;
             }
         }
     }

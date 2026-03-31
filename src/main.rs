@@ -1,62 +1,64 @@
 use clap::{Command, arg, command, value_parser};
 use fl::FL;
 
-fn main() {
+fn main() -> anyhow::Result<()> {
     let matches = get_clap_cmd().get_matches();
     let auto_update = matches.get_flag("update");
 
     match matches.subcommand() {
         Some(("init", _)) => {
-            FL::init();
+            FL::init()?;
         }
         Some(("update", _)) => {
-            FL::in_current_dir().update();
+            FL::in_current_dir()?.update()?;
         }
         Some(("status", _)) => {
-            let mut fl = FL::in_current_dir();
+            let mut fl = FL::in_current_dir()?;
             if auto_update {
-                fl.update();
+                fl.update()?;
             }
             // Don't print dir changes, because it will print the files that got changed anyway
             // This will make it feel more like `git status`
             fl.ignore_dir_modifications = true;
-            fl.diff_stage(-1);
+            fl.diff_stage(-1)?;
         }
         Some(("diff", sub)) => {
-            let fl = FL::in_current_dir();
+            let fl = FL::in_current_dir()?;
             if auto_update {
-                fl.update();
+                fl.update()?;
             }
             let first = *sub.get_one::<i32>("FIRST").unwrap();
             match sub.get_one::<i32>("SECOND") {
-                Some(&second) => fl.diff_history(first, second),
-                None => fl.diff_stage(first),
+                Some(&second) => fl.diff_history(first, second)?,
+                None => fl.diff_stage(first)?,
             }
         }
         Some(("commit", sub)) => {
-            let mut fl = FL::in_current_dir();
+            let mut fl = FL::in_current_dir()?;
             if auto_update {
-                fl.update();
+                fl.update()?;
             }
             let message = sub.get_one::<String>("MESSAGE");
             let empty = sub.get_flag("empty");
 
             if empty {
-                fl.commit_empty();
+                fl.commit_empty()?;
             } else if let Some(m) = message {
-                fl.commit_message(m);
+                fl.commit_message(m)?;
             } else {
-                fl.commit_interactive();
+                fl.commit_interactive()?;
             }
         }
         Some(("log", _)) => {
-            FL::in_current_dir().print_short_log();
+            FL::in_current_dir()?.print_short_log()?;
         }
         Some(("pwd", _)) => {
-            println!("{}", FL::in_current_dir().root().display());
+            println!("{}", FL::in_current_dir()?.root().display());
         }
         _ => {}
     }
+
+    Ok(())
 }
 
 fn get_clap_cmd() -> Command {

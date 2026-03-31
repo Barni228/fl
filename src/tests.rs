@@ -329,7 +329,7 @@ fn test_diff_output_is_sorted() {
 #[test]
 fn test_repo_find() {
     assert_eq!(
-        fs_helper::find_fl_path("test_repo".into()),
+        FL::find_fl_path("test_repo".into()),
         Some(PathBuf::from("test_repo"))
     );
 }
@@ -337,11 +337,11 @@ fn test_repo_find() {
 #[test]
 fn test_repo_parent() {
     assert_eq!(
-        fs_helper::find_fl_path("test_repo/subfolder".into()),
+        FL::find_fl_path("test_repo/subfolder".into()),
         Some(PathBuf::from("test_repo"))
     );
     assert_eq!(
-        fs_helper::find_fl_path("test_repo/subfolder/sub-sub-folder".into()),
+        FL::find_fl_path("test_repo/subfolder/sub-sub-folder".into()),
         Some(PathBuf::from("test_repo"))
     );
 }
@@ -349,28 +349,28 @@ fn test_repo_parent() {
 #[test]
 fn test_repo_not_found() {
     // the root folder is probably not a fl repo, at least I hope so
-    assert_eq!(fs_helper::find_fl_path("/".into()), None);
+    assert_eq!(FL::find_fl_path("/".into()), None);
 }
 
 // ─── Update ───────────────────────────────────────────────────────────────────
 // TODO: Don't create a temp folder in the current dir, and don't assume fl init just creates `.fl/history`
 #[test]
-fn test_update() {
+fn test_update() -> io::Result<()> {
     // let test_folder = std::env::temp_dir().join("__temp_test_update_folder");
     let test_folder = PathBuf::from("__temp_test_update_folder");
 
     // "create" a new repo
     let _ = fs::remove_dir_all(test_folder.clone());
-    fs::create_dir_all(test_folder.join(".fl").join("history")).unwrap();
+    fs::create_dir_all(test_folder.join(".fl").join("history"))?;
 
     // create a file in the repo
     let file_path = test_folder.join("file.txt");
-    fs::write(&file_path, "hello\n").unwrap();
+    fs::write(&file_path, "hello\n")?;
 
-    let fl = FL::new(test_folder.clone());
-    fl.update();
+    let fl = FL::new(test_folder.clone())?;
+    fl.update()?;
 
-    let content = fs::read_to_string(fl.stage_path()).unwrap();
+    let content = fs::read_to_string(fl.stage_path())?;
     let parsed: serde_json::Value = serde_json::from_str(&content).unwrap();
 
     assert_eq!(
@@ -387,5 +387,16 @@ fn test_update() {
     );
 
     // cleanup after
-    fs::remove_dir_all(test_folder).unwrap();
+    fs::remove_dir_all(test_folder)
+}
+
+// ─── Errors ───────────────────────────────────────────────────────────────────
+#[test]
+fn test_commit_no_exist() {
+    let err = commit::Commit::from_path("no_exist").unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        // "fatal: Failed to read '.fl/history/no_exist' file: No such file or directory"
+        "failed to open file `no_exist`: No such file or directory (os error 2)"
+    )
 }
