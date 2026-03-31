@@ -3,14 +3,16 @@ use filelist::FileList;
 use std::{
     cmp::{max, min},
     collections::HashMap,
-    fmt,
+    env, fmt,
+    io::{self, Write},
     path::{Path, PathBuf},
+    process,
 };
 
 use crate::commit::Commit;
 
 pub mod commit;
-mod fs_helper;
+pub mod fs_helper;
 mod rename_detection;
 
 /// Represents a change detected between two file snapshots.
@@ -240,12 +242,70 @@ impl FL {
         self.commit_commit(&stage);
     }
 
-    pub fn commit_message(&mut self, title: String, body: String) {
+    pub fn commit_message(&mut self, message: &str) {
+        let (title, body) = message
+            .split_once('\n')
+            .map(|(t, b)| (t.trim_end(), b.trim()))
+            .unwrap_or((message, ""));
+
+        self.commit_title_body(title.to_string(), body.to_string());
+    }
+
+    pub fn commit_title_body(&mut self, title: String, body: String) {
         let mut stage = Commit::from_path(self.stage_path());
         stage.title = Some(title);
         stage.body = Some(body);
         stage.set_timestamp_now();
         self.commit_commit(&stage);
+    }
+
+    pub fn commit_interactive(&mut self) {
+        // these should also be config options
+        let ask_confirmation = true;
+        let editor = env::var("EDITOR").unwrap_or_else(|_| "vim".to_string());
+
+        let mut path = env::temp_dir();
+        path.push("FL_COMMIT_MESSAGE");
+
+        fs_helper::write(
+            &path,
+            "# Write your commit message. Lines starting with '#' will be ignored.",
+        );
+
+        let status = process::Command::new(editor)
+            .arg(&path)
+            .status()
+            .expect("Failed to open editor");
+
+        if !status.success() {
+            eprintln!("Editor exited with error");
+            return;
+        }
+
+        if ask_confirmation {
+            print!("Press enter to commit: ");
+            io::stdout().flush().unwrap();
+            io::stdin().read_line(&mut String::new()).unwrap();
+        }
+
+        let content = fs_helper::read_to_string(&path);
+
+        let _ = std::fs::remove_file(&path);
+
+        let cleaned = content
+            .lines()
+            // filter out comments
+            .filter(|l| !l.trim_start().starts_with('#'))
+            .collect::<Vec<_>>()
+            .join("\n")
+            .trim()
+            .to_string();
+
+        if cleaned.is_empty() {
+            self.commit_empty();
+        } else {
+            self.commit_message(&cleaned);
+        }
     }
 
     pub fn print_short_log(&self) {
@@ -305,7 +365,6 @@ impl FL {
 
         let commits = fs_helper::read_dir(&history_path)
             .filter_map(Result::ok) // ignore read errors
-            // .filter_map(|e| e.inspect_err(warn_invalid).ok())
             // convert file name to string
             .filter_map(|e| {
                 e.file_name()

@@ -5,13 +5,14 @@
 - [ ] maybe create a `fix` command that fixes invalid `.fl/` folder
 - [ ] Add `add` and `remove` (`rm`) commands that will add/remove files from STAGE
 - [ ] Add a way to edit commit history
-- [ ] Allow commits to have body text
 - [ ] Add `show` command which shows what a specific commit did
 - [ ] Add `log --follow` command, that shows every commit that changed a specific file
+- [ ] Add a way to filter commits, like `-ad` for only add or delete actions
 
 ## Bugs / Improvements
 
 - [ ] maybe remove dead code from `fs_helper.rs`
+- [ ] Add more tests, to test things other than `diff`
 - [ ] maybe store history paths in hex numbers instead of regular numbers (`{:08x}`)
 - [ ] Don't panic when `.fl/` folder is invalid (does not contain `history/`, or has weird permissions)
 - [ ] Improve Error handling, so I return `Result` instead of always exiting with error
@@ -19,6 +20,7 @@
 
 ## Done
 
+- [x] Allow commits to have body text
 - [x] Improve `filelist` so it can return `BTreeMap` directory, instead of parsing strings
 - [x] Make commits have a date and time
 - [x] maybe store commit files in some known format like `json`, `toml`, or `yaml`

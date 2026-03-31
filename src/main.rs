@@ -40,12 +40,13 @@ fn main() {
             }
             let message = sub.get_one::<String>("MESSAGE");
             let empty = sub.get_flag("empty");
-            if empty || message.is_none() {
+
+            if empty {
                 fl.commit_empty();
             } else if let Some(m) = message {
-                fl.commit_message(m.to_string(), Default::default());
+                fl.commit_message(m);
             } else {
-                unreachable!()
+                fl.commit_interactive();
             }
         }
         Some(("log", _)) => {
@@ -95,7 +96,7 @@ fn get_clap_cmd() -> Command {
                 .about("Commit changes")
                 .alias("c")
                 .args([
-                    arg!([MESSAGE] "Commit message"),
+                    arg!([MESSAGE] "Commit message, first line will be used as title while all other lines will be used as body"),
                     arg!(-e --empty "Commit with no message"),
                 ]),
             Command::new("log").about("Print history log").alias("l"),
