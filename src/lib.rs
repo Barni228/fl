@@ -1,4 +1,4 @@
-use anyhow::Context;
+use crate::commit::Commit;
 use colored::Colorize;
 use filelist::FileList;
 use fs_err as fs;
@@ -11,10 +11,32 @@ use std::{
     process,
 };
 
-use crate::commit::Commit;
-
 pub mod commit;
 mod rename_detection;
+
+/// Alias for a `Result` with the error type [`crate::Error`]
+pub type Result<T, E = Error> = std::result::Result<T, E>;
+
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
+    #[error("I/O error: {0}")]
+    IOError(#[from] io::Error),
+
+    #[error("fatal: not inside an fl repository (or any of the parent directories): `{0}`")]
+    RepoNotFound(PathBuf),
+
+    #[error("fatal: Invalid commit index: {index} (must be between {min} and {max})", min = -max-1)]
+    CommitNotFound { index: i32, max: i32 },
+
+    #[error("Failed to parse commit from json")]
+    CommitError(#[from] commit::CommitError),
+
+    #[error("Command not found: `{0}`")]
+    CommandNotFound(String),
+
+    #[error("Commit Editor exited with non-zero status: {0:?}")]
+    CommitEditorFailed(Option<i32>),
+}
 
 /// Represents a change detected between two file snapshots.
 ///
@@ -96,7 +118,7 @@ pub struct FL {
 
 // Constructors
 impl FL {
-    /// Creates a new `FL` instance for an existing repository root.
+    /// Creates a new [`FL`] instance for an existing repository root.
     ///
     /// This does not create any folders. It only initializes the struct
     /// and scans the `.fl/history` directory to determine the current
@@ -116,9 +138,7 @@ impl FL {
 
     /// Creates a new `FL` instance by locating a `.fl` repository
     /// starting from the current directory and walking up parent directories.
-    ///
-    /// This is similar to how tools like Git locate repositories.
-    pub fn in_current_dir() -> anyhow::Result<FL> {
+    pub fn in_current_dir() -> Result<FL> {
         let fl = FL::new(FL::find_root_path()?)?;
         Ok(fl)
     }
@@ -126,7 +146,7 @@ impl FL {
     /// Initializes a new `.fl` repository at the given path.
     ///
     /// This creates the required `.fl` and `.fl/history` directories,
-    /// then returns an initialized `FL` instance.
+    /// then returns an initialized [`FL`] instance.
     ///
     /// # Arguments
     /// * `root` - Directory where the repository should be created.
@@ -185,9 +205,9 @@ impl FL {
     /// * `D` - Deleted file
     /// * `M` - Modified file
     /// * `R` - Renamed/moved file
-    pub fn diff_history(&self, a: i32, b: i32) -> anyhow::Result<()> {
-        let valid_a = self.to_valid_history_index(a);
-        let valid_b = self.to_valid_history_index(b);
+    pub fn diff_history(&self, a: i32, b: i32) -> Result<()> {
+        let valid_a = self.to_valid_history_index(a)?;
+        let valid_b = self.to_valid_history_index(b)?;
 
         // always compare older commit to newer commit
         let first = min(valid_a, valid_b);
@@ -197,7 +217,8 @@ impl FL {
         self.diff_paths(
             &self.history_file_path(first),
             &self.history_file_path(second),
-        )
+        )?;
+        Ok(())
     }
 
     /// Compares the current staged snapshot (`STAGE.json`) with a commit.
@@ -213,14 +234,14 @@ impl FL {
     /// * `D` - Deleted file
     /// * `M` - Modified file
     /// * `R` - Renamed/moved file
-    pub fn diff_stage(&self, commit: i32) -> anyhow::Result<()> {
+    pub fn diff_stage(&self, commit: i32) -> Result<()> {
         let stage = Commit::from_path(self.stage_path())?;
         // if there are no commits, if user gave -1 or 0, diff against empty commit
         let target_commit = if self.commits == 0 && [-1, 0].contains(&commit) {
             println!("Diffing EMPTY and STAGE");
             Commit::default()
         } else {
-            let valid_commit = self.to_valid_history_index(commit);
+            let valid_commit = self.to_valid_history_index(commit)?;
             println!("Diffing {valid_commit} and STAGE");
             Commit::from_path(self.history_file_path(valid_commit))?
         };
@@ -230,7 +251,7 @@ impl FL {
     }
 
     /// Commit the STAGE file, without a commit message
-    pub fn commit_empty(&mut self) -> anyhow::Result<()> {
+    pub fn commit_empty(&mut self) -> Result<()> {
         let mut stage = Commit::from_path(self.stage_path())?;
         stage.set_timestamp_now();
         self.commit_commit(&stage)
@@ -238,7 +259,7 @@ impl FL {
 
     /// Commit the STAGE file, with a commit message
     /// First line of the message will be used as the title, the rest as the body
-    pub fn commit_message(&mut self, message: &str) -> anyhow::Result<()> {
+    pub fn commit_message(&mut self, message: &str) -> Result<()> {
         let (title, body) = message
             .split_once('\n')
             .map(|(t, b)| (t.trim_end(), b.trim()))
@@ -248,7 +269,7 @@ impl FL {
     }
 
     /// Commit the STAGE file, with a title and body
-    pub fn commit_title_body(&mut self, title: String, body: String) -> anyhow::Result<()> {
+    pub fn commit_title_body(&mut self, title: String, body: String) -> Result<()> {
         let mut stage = Commit::from_path(self.stage_path())?;
         stage.title = Some(title);
         stage.body = Some(body);
@@ -257,10 +278,10 @@ impl FL {
     }
 
     /// Commit the STAGE file, but open an editor to write a commit message
-    pub fn commit_interactive(&mut self) -> anyhow::Result<()> {
+    pub fn commit_interactive(&mut self) -> Result<()> {
         // these should also be config options
         let ask_confirmation = true;
-        let editor = env::var("EDITOR").unwrap_or_else(|_| "vim".to_string());
+        let editor = env::var("EDITOR").unwrap_or("vim".to_string());
 
         let mut path = env::temp_dir();
         path.push("FL_COMMIT_MESSAGE");
@@ -270,21 +291,19 @@ impl FL {
             "# Write your commit message. Lines starting with '#' will be ignored.",
         )?;
 
-        let status = process::Command::new(editor)
+        let status = process::Command::new(&editor)
             .arg(&path)
             .status()
-            .context("Failed to open editor")?;
+            .map_err(|_| Error::CommandNotFound(editor.to_string()))?;
 
-        // if !status.success() {
-        //     anyhow::bail!("Editor exited with error");
-        // }
-        // same as above
-        anyhow::ensure!(status.success(), "Editor exited with error");
+        if !status.success() {
+            return Err(Error::CommitEditorFailed(status.code()));
+        }
 
         if ask_confirmation {
             print!("Press enter to commit: ");
-            io::stdout().flush().unwrap();
-            io::stdin().read_line(&mut String::new()).unwrap();
+            io::stdout().flush()?;
+            io::stdin().read_line(&mut String::new())?;
         }
 
         let content = fs::read_to_string(&path)?;
@@ -307,7 +326,7 @@ impl FL {
         }
     }
 
-    pub fn print_short_log(&self) -> anyhow::Result<()> {
+    pub fn print_short_log(&self) -> Result<()> {
         // TODO: these should be config options
         let print_title = true;
         let print_title_quotes = false;
@@ -410,7 +429,7 @@ impl FL {
     }
 
     /// This will commit a [`commit::Commit`] object
-    fn commit_commit(&mut self, commit: &Commit) -> anyhow::Result<()> {
+    fn commit_commit(&mut self, commit: &Commit) -> Result<()> {
         let out_path = self.history_file_path(self.commits);
 
         // if there is a previous commit, diff against it
@@ -428,7 +447,7 @@ impl FL {
         Ok(())
     }
 
-    fn diff_paths(&self, old: &Path, new: &Path) -> anyhow::Result<()> {
+    fn diff_paths(&self, old: &Path, new: &Path) -> Result<(), commit::CommitError> {
         let old = Commit::from_path(old)?;
         let new = Commit::from_path(new)?;
         let actions = FL::diff_commit(&old, &new);
@@ -573,27 +592,23 @@ impl FL {
     ///
     /// # Panics
     /// Panics if index is out of bounds
-    fn to_valid_history_index(&self, index: i32) -> i32 {
+    fn to_valid_history_index(&self, index: i32) -> Result<i32> {
         match index {
-            n if 0 <= n && n < self.commits => index,
-            n if -self.commits <= n && n < 0 => self.commits + n,
-            _ => {
-                eprintln!(
-                    "fatal: Invalid commit index: {} (must be between {} and {})",
-                    index,
-                    -self.commits,
-                    self.commits - 1
-                );
-                process::exit(2);
-            }
+            n if 0 <= n && n < self.commits => Ok(index),
+            n if -self.commits <= n && n < 0 => Ok(self.commits + n),
+            _ => Err(Error::CommitNotFound {
+                index,
+                max: self.commits - 1,
+            }),
         }
     }
 
-    fn find_root_path() -> anyhow::Result<PathBuf> {
-        let dir = env::current_dir().context("Failed to get current directory")?;
+    fn find_root_path() -> Result<PathBuf> {
+        // let dir = env::current_dir().context("Failed to get current directory")?;
+        let dir = env::current_dir()?;
 
-        FL::find_fl_path(dir)
-            .context("fatal: not inside an fl repository (or any of the parent directories)")
+        FL::find_fl_path(dir.clone()).ok_or(Error::RepoNotFound(dir))
+        // .context("fatal: not inside an fl repository (or any of the parent directories)")
     }
 
     fn find_fl_path(mut dir: PathBuf) -> Option<PathBuf> {

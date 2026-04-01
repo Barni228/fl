@@ -365,7 +365,7 @@ fn test_update() -> io::Result<()> {
 
     // create a file in the repo
     let file_path = test_folder.join("file.txt");
-    fs::write(&file_path, "hello\n")?;
+    fs::write(&file_path, "hello\n").unwrap();
 
     let fl = FL::new(test_folder.clone())?;
     fl.update()?;
@@ -396,7 +396,6 @@ fn test_commit_no_exist() {
     let err = commit::Commit::from_path("no_exist").unwrap_err();
     assert_eq!(
         err.to_string(),
-        // "fatal: Failed to read '.fl/history/no_exist' file: No such file or directory"
-        "failed to open file `no_exist`: No such file or directory (os error 2)"
+        "I/O error: failed to open file `no_exist`: No such file or directory (os error 2)"
     )
 }

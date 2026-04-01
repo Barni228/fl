@@ -12,7 +12,6 @@
 
 ## Bugs / Improvements
 
-- [ ] Use custom error types instead of `anyhow::Result`
 - [ ] Add more tests, to test things other than `diff`
 - [ ] maybe store history paths in hex numbers instead of regular numbers (`{:08x}`)
 - [ ] Don't panic when `.fl/` folder is invalid (does not contain `history/`, or has weird permissions)
@@ -20,6 +19,7 @@
 
 ## Done
 
+- [x] Use custom error types instead of `anyhow::Result`
 - [x] maybe remove dead code from `fs_helper.rs`
 - [x] Improve Error handling, so I return `Result` instead of always exiting with error
 - [x] Allow commits to have body text

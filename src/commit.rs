@@ -1,4 +1,3 @@
-use anyhow::Context;
 use fs_err as fs;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -6,6 +5,7 @@ use std::{
     io,
     path::{Path, PathBuf},
 };
+use thiserror::Error;
 use time::{Duration, OffsetDateTime};
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -20,6 +20,15 @@ pub struct Commit {
     pub snapshot: BTreeMap<PathBuf, String>,
 }
 
+#[derive(Error, Debug)]
+pub enum CommitError {
+    #[error("Failed to parse commit from json")]
+    ParseError(#[from] serde_json::Error),
+
+    #[error("I/O error: {0}")]
+    IOError(#[from] io::Error),
+}
+
 impl Commit {
     /// Creates a new commit with the current timestamp
     pub fn with_timestamp() -> Self {
@@ -29,14 +38,9 @@ impl Commit {
     }
 
     /// Loads a commit from a file
-    pub fn from_path(path: impl AsRef<Path>) -> anyhow::Result<Self> {
+    pub fn from_path(path: impl AsRef<Path>) -> Result<Self, CommitError> {
         let content = fs::read_to_string(&path)?;
-        let commit = serde_json::from_str::<Commit>(&content).with_context(|| {
-            format!(
-                "Failed to parse commit from json {}",
-                path.as_ref().display()
-            )
-        })?;
+        let commit = serde_json::from_str::<Commit>(&content)?;
         Ok(commit)
     }
 
