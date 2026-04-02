@@ -12,6 +12,7 @@ use std::{
 };
 
 pub mod commit;
+pub mod config;
 mod rename_detection;
 
 /// Alias for a `Result` with the error type [`crate::Error`]
@@ -19,11 +20,11 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
-    #[error("I/O error: {0}")]
-    IOError(#[from] io::Error),
-
     #[error("fatal: not inside an fl repository (or any of the parent directories): `{0}`")]
     RepoNotFound(PathBuf),
+
+    #[error("Failed to parse config")]
+    InvalidConfig(#[from] toml::de::Error),
 
     #[error("fatal: Invalid commit index: {index} (must be between {min} and {max})", min = -max-1)]
     CommitNotFound { index: i32, max: i32 },
@@ -31,8 +32,14 @@ pub enum Error {
     #[error("Failed to parse commit from json")]
     CommitError(#[from] commit::CommitError),
 
+    #[error("I/O error: {0}")]
+    IOError(#[from] io::Error),
+
     #[error("Command not found: `{0}`")]
     CommandNotFound(String),
+
+    #[error("Environment variable not found: {0}")]
+    EnvVarNotFound(#[from] std::env::VarError),
 
     #[error("Commit Editor exited with non-zero status: {0:?}")]
     CommitEditorFailed(Option<i32>),
@@ -111,7 +118,10 @@ pub struct FL {
     root: PathBuf,
     /// number of commits, last commit is `commits - 1`
     commits: i32,
-    // TODO: make this part of `config` field, when i will implement config fields
+    /// Config options
+    pub config: config::Config,
+
+    // TODO: this is too niche to be in config, make it a filter when you add filters
     /// if true, add `diff` commands will ignore modifications on directories
     pub ignore_dir_modifications: bool,
 }
@@ -126,10 +136,13 @@ impl FL {
     ///
     /// # Arguments
     /// * `root` - Path to the directory containing the `.fl` folder.
-    pub fn new(root: PathBuf) -> io::Result<FL> {
+    pub fn new(root: PathBuf) -> Result<FL> {
+        let config_text = fs::read_to_string(root.join(".fl").join("config.toml"))?;
+        let config = toml::from_str(&config_text)?;
         let mut fl = FL {
             root,
             commits: 0,
+            config,
             ignore_dir_modifications: false,
         };
         fl.update_commits()?;
@@ -150,10 +163,12 @@ impl FL {
     ///
     /// # Arguments
     /// * `root` - Directory where the repository should be created.
-    pub fn create_fl_repo(root: PathBuf) -> io::Result<FL> {
+    pub fn create_fl_repo(root: PathBuf) -> Result<FL> {
         fs::create_dir(root.join(".fl"))?;
         fs::create_dir(root.join(".fl").join("history"))?;
         Commit::default().save_to(root.join(".fl").join("STAGE.json"))?;
+
+        fs::write(root.join(".fl").join("config.toml"), config::DEFAULT_CONFIG)?;
 
         FL::new(root)
     }
@@ -161,7 +176,7 @@ impl FL {
     /// Initializes a new `.fl` repository in the current working directory.
     ///
     /// This is a convenience wrapper around [`FL::create_fl_repo`].
-    pub fn init() -> io::Result<FL> {
+    pub fn init() -> Result<FL> {
         FL::create_fl_repo(env::current_dir()?)
     }
 }
@@ -279,9 +294,8 @@ impl FL {
 
     /// Commit the STAGE file, but open an editor to write a commit message
     pub fn commit_interactive(&mut self) -> Result<()> {
-        // these should also be config options
-        let ask_confirmation = true;
-        let editor = env::var("EDITOR").unwrap_or("vim".to_string());
+        let editor = self.config.editor.editor()?;
+        let args = self.config.editor.args()?;
 
         let mut path = env::temp_dir();
         path.push("FL_COMMIT_MESSAGE");
@@ -292,15 +306,16 @@ impl FL {
         )?;
 
         let status = process::Command::new(&editor)
+            .args(&args)
             .arg(&path)
             .status()
-            .map_err(|_| Error::CommandNotFound(editor.to_string()))?;
+            .map_err(|_| Error::CommandNotFound(editor))?;
 
         if !status.success() {
             return Err(Error::CommitEditorFailed(status.code()));
         }
 
-        if ask_confirmation {
+        if self.config.editor.ask_confirm {
             print!("Press enter to commit: ");
             io::stdout().flush()?;
             io::stdin().read_line(&mut String::new())?;
@@ -327,27 +342,26 @@ impl FL {
     }
 
     pub fn print_short_log(&self) -> Result<()> {
-        // TODO: these should be config options
-        let print_title = true;
-        let print_title_quotes = false;
-        let print_number_of_changes = false;
-        let print_time_ago = true;
+        let start = match self.config.log.max {
+            0 => 0,
+            n => max(0, self.commits - n as i32),
+        };
 
-        for i in 0..self.commits {
+        for i in start..self.commits {
             let path = self.history_file_path(i);
             let commit = Commit::from_path(&path)?;
 
-            let title = match print_title {
+            let title = match self.config.log.print_title {
                 true => commit.title.as_deref().unwrap_or("No commit message"),
                 false => "",
             };
 
-            let title_quotes = match print_title_quotes {
+            let title_quotes = match self.config.log.print_title_quotes {
                 true => "\"",
                 false => "",
             };
 
-            let changes = match print_number_of_changes {
+            let changes = match self.config.log.print_number_of_changes {
                 true => {
                     let prev_commit = if i > 0 {
                         Commit::from_path(self.history_file_path(i - 1))?
@@ -360,12 +374,16 @@ impl FL {
                 false => "".to_string(),
             };
 
-            let time_ago = match print_time_ago {
+            let time_ago = match self.config.log.print_time_ago {
                 true => format!(" ({})", commit.time_ago()),
                 false => "".to_string(),
             };
+            let date = match self.config.log.print_date {
+                true => format!(" ({})", commit.date()),
+                false => "".to_string(),
+            };
 
-            println!("{i}: {title_quotes}{title}{title_quotes}{changes}{time_ago}");
+            println!("{i}: {title_quotes}{title}{title_quotes}{changes}{time_ago}{date}");
         }
 
         Ok(())
@@ -468,7 +486,11 @@ impl FL {
             {
                 continue;
             }
-            println!("{}", action.colored());
+            if self.config.use_color() {
+                println!("{}", action.colored());
+            } else {
+                println!("{}", action);
+            }
         }
     }
 

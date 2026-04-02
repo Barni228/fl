@@ -353,21 +353,20 @@ fn test_repo_not_found() {
 }
 
 // ─── Update ───────────────────────────────────────────────────────────────────
-// TODO: Don't create a temp folder in the current dir, and don't assume fl init just creates `.fl/history`
 #[test]
-fn test_update() -> io::Result<()> {
+fn test_update() -> anyhow::Result<()> {
     // let test_folder = std::env::temp_dir().join("__temp_test_update_folder");
     let test_folder = PathBuf::from("__temp_test_update_folder");
 
-    // "create" a new repo
+    // create a test folder
     let _ = fs::remove_dir_all(test_folder.clone());
-    fs::create_dir_all(test_folder.join(".fl").join("history"))?;
+    fs::create_dir(&test_folder)?;
 
     // create a file in the repo
     let file_path = test_folder.join("file.txt");
     fs::write(&file_path, "hello\n").unwrap();
 
-    let fl = FL::new(test_folder.clone())?;
+    let fl = FL::create_fl_repo(test_folder.clone())?;
     fl.update()?;
 
     let content = fs::read_to_string(fl.stage_path())?;
@@ -387,7 +386,8 @@ fn test_update() -> io::Result<()> {
     );
 
     // cleanup after
-    fs::remove_dir_all(test_folder)
+    fs::remove_dir_all(test_folder)?;
+    Ok(())
 }
 
 // ─── Errors ───────────────────────────────────────────────────────────────────

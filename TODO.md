@@ -9,6 +9,7 @@
 - [ ] Add `log --follow` command, that shows every commit that changed a specific file
 - [ ] Add a way to filter commits, like `-ad` for only add or delete actions
 - [ ] Add a way to ignore files/folders, like `.gitignore`
+- [ ] Add a `config` command, that stores some config options
 
 ## Bugs / Improvements
 

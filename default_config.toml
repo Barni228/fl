@@ -1,0 +1,24 @@
+# When to use colors, possible values: "auto", "always", "never"
+colors = "auto"
+
+[editor]
+# Editor to use, leave empty for default ("$EDITOR" if exists, or "vim" otherwise)
+# You can use env variable by prefixing with `$`, and extra args by just adding them to array
+# For example: editor = ["$EDITOR", "--wait"]
+command = []
+# enable this if your editor exits before saving the file (e.g. VSCode by default)
+ask_confirm = false
+
+[log]
+# Maximum number of most recent commits to print, set to 0 to print all
+max = 0
+# If true, print the commit title in `log` output
+print_title = true
+# If true, and `print_title` is true, print quotes around the title
+print_title_quotes = false
+# If true, print the number of changes commit has
+print_number_of_changes = false
+# If true, print how long ago the commit was
+print_time_ago = true
+# If true, print the date when commit was made
+print_date = false

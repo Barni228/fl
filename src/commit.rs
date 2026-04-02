@@ -63,6 +63,14 @@ impl Commit {
             "<missing timestamp>".to_string()
         }
     }
+
+    pub fn date(&self) -> String {
+        if let Some(ts) = self.timestamp {
+            ts.date().to_string()
+        } else {
+            "<missing timestamp>".to_string()
+        }
+    }
 }
 
 fn time_ago(ts: OffsetDateTime) -> String {
