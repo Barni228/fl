@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 use std::env;
 use std::io::{self, IsTerminal};
 
+// All config options can be overridden via CLI arguments
+
 /// Default toml file, includes comments explaining what each option does <br>
 /// If you parse it, it will be same as [`Config::default`]
 ///
@@ -18,7 +20,15 @@ pub const DEFAULT_CONFIG: &str = include_str!("../default_config.toml");
 
 // Types
 
+#[derive(thiserror::Error, Debug)]
+pub enum BetterEnvError {
+    // source is a special name, thiserror will use it for .source() method
+    #[error("Failed to get env var `{var}`")]
+    EnvVarError { var: String, source: env::VarError },
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct Config {
     pub colors: ColorOptions,
     pub editor: Editor,
@@ -26,12 +36,14 @@ pub struct Config {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct Editor {
     pub command: Vec<String>,
     pub ask_confirm: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Log {
     pub max: u32,
     pub print_title: bool,
@@ -42,6 +54,7 @@ pub struct Log {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 #[serde(rename_all = "lowercase")]
 pub enum ColorOptions {
     #[default]
@@ -77,7 +90,7 @@ impl Config {
 
 // Helpers
 impl Editor {
-    pub fn editor(&self) -> Result<String, env::VarError> {
+    pub fn editor(&self) -> Result<String, BetterEnvError> {
         // if command has at least something, use it
         if let Some(first) = self.command.first() {
             Editor::handle_env(first)
@@ -90,7 +103,7 @@ impl Editor {
         }
     }
 
-    pub fn args(&self) -> Result<Vec<String>, env::VarError> {
+    pub fn args(&self) -> Result<Vec<String>, BetterEnvError> {
         self.command
             .iter()
             .skip(1) // skip the first element, which is the editor
@@ -98,9 +111,12 @@ impl Editor {
             .collect()
     }
 
-    fn handle_env(s: &str) -> Result<String, env::VarError> {
+    fn handle_env(s: &str) -> Result<String, BetterEnvError> {
         if let Some(env_var) = s.strip_prefix('$') {
-            env::var(env_var)
+            env::var(env_var).map_err(|_| BetterEnvError::EnvVarError {
+                var: env_var.to_string(),
+                source: env::VarError::NotPresent,
+            })
         } else {
             Ok(s.to_string())
         }

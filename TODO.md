@@ -10,6 +10,7 @@
 - [ ] Add a way to filter commits, like `-ad` for only add or delete actions
 - [ ] Add a way to ignore files/folders, like `.gitignore`
 - [ ] Add a `config` command, that stores some config options
+- [ ] Allow a global `~/.config/fl/config.toml` config (use `config` crate)
 
 ## Bugs / Improvements
 

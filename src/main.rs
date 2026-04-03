@@ -52,6 +52,31 @@ fn main() -> anyhow::Result<()> {
         Some(("log", _)) => {
             FL::in_current_dir()?.print_short_log()?;
         }
+        Some(("config", sub)) => match sub.subcommand() {
+            Some(("default", _)) => {
+                println!("{}", fl::config::DEFAULT_CONFIG);
+            }
+            Some(("path", _)) => {
+                let config_path = FL::in_current_dir()?.config_path();
+                println!("{}", config_path.display());
+            }
+            Some(("open", _)) => {
+                let fl = FL::in_current_dir()?;
+                fl.open_interactive(fl.config_path())?;
+            }
+            Some(("get", sub)) => {
+                todo!();
+            }
+            Some(("set", sub)) => {
+                let key = sub.get_one::<String>("KEY").unwrap();
+                if let Some(value) = sub.get_one::<String>("VALUE") {
+                    FL::in_current_dir()?.set_config_key(key, value)?;
+                } else {
+                    todo!();
+                }
+            }
+            _ => {}
+        },
         Some(("pwd", _)) => {
             println!("{}", FL::in_current_dir()?.root().display());
         }
@@ -80,8 +105,7 @@ fn get_clap_cmd() -> Command {
                 .alias("u"),
             Command::new("status")
                 .about("Print changes to files compared to last commit")
-                .alias("s")
-                .alias("st"),
+                .aliases(["s", "st"]),
             Command::new("diff")
                 .about("Print what has changed between 2 commits")
                 .alias("d")
@@ -102,6 +126,19 @@ fn get_clap_cmd() -> Command {
                     arg!(-e --empty "Commit with no message"),
                 ]),
             Command::new("log").about("Print history log").alias("l"),
+            Command::new("config").about("Edit fl config file").aliases(["conf", "cfg"]).subcommands([
+                Command::new("default").about("Print default fl config file"),
+                Command::new("path").about("Print path to fl config file"),
+                Command::new("open").about("Open fl config file in editor"),
+                Command::new("get")
+                    .about("Get a key from fl config file")
+                    //  TODO: maybe leave empty to print all
+                    .arg(arg!(<KEY> "Key")),
+                Command::new("set")
+                    .about("Set a key in fl config file")
+                    .arg(arg!(<KEY> "Key"))
+                    .arg(arg!([VALUE] "Value, leave empty to reset to default")),
+            ]),
             Command::new("pwd")
                 .about("Print the current fl repo path")
                 .alias("p"),

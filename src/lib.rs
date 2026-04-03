@@ -23,8 +23,19 @@ pub enum Error {
     #[error("fatal: not inside an fl repository (or any of the parent directories): `{0}`")]
     RepoNotFound(PathBuf),
 
+    // NOTE: because anyhow already prints the inner `#[from]` error, I don't need to have `{0}`
     #[error("Failed to parse config")]
     InvalidConfig(#[from] toml::de::Error),
+
+    #[error("Failed to set `{key}` to `{value}`")]
+    TomlSetError {
+        key: String, // full name of the thing to set ("a.b", "a.b" will be the String)
+        value: String,
+        source: TomlSetError,
+    },
+
+    #[error("Failed to parse config with toml_edit")]
+    InvalidConfigEdit(#[from] toml_edit::TomlError),
 
     #[error("fatal: Invalid commit index: {index} (must be between {min} and {max})", min = -max-1)]
     CommitNotFound { index: i32, max: i32 },
@@ -32,17 +43,26 @@ pub enum Error {
     #[error("Failed to parse commit from json")]
     CommitError(#[from] commit::CommitError),
 
-    #[error("I/O error: {0}")]
+    #[error("I/O error")]
     IOError(#[from] io::Error),
 
     #[error("Command not found: `{0}`")]
     CommandNotFound(String),
 
-    #[error("Environment variable not found: {0}")]
-    EnvVarNotFound(#[from] std::env::VarError),
+    #[error("Environment variable not found")]
+    EnvVarNotFound(#[from] config::BetterEnvError),
 
     #[error("Commit Editor exited with non-zero status: {0:?}")]
     CommitEditorFailed(Option<i32>),
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum TomlSetError {
+    #[error("`{0}` is not a table")]
+    NotTable(String), // name of the thing that is not table (`a.b`, "a" will be the String)
+
+    #[error("Empty Key")]
+    EmptyKey,
 }
 
 /// Represents a change detected between two file snapshots.
@@ -294,9 +314,6 @@ impl FL {
 
     /// Commit the STAGE file, but open an editor to write a commit message
     pub fn commit_interactive(&mut self) -> Result<()> {
-        let editor = self.config.editor.editor()?;
-        let args = self.config.editor.args()?;
-
         let mut path = env::temp_dir();
         path.push("FL_COMMIT_MESSAGE");
 
@@ -305,21 +322,7 @@ impl FL {
             "# Write your commit message. Lines starting with '#' will be ignored.",
         )?;
 
-        let status = process::Command::new(&editor)
-            .args(&args)
-            .arg(&path)
-            .status()
-            .map_err(|_| Error::CommandNotFound(editor))?;
-
-        if !status.success() {
-            return Err(Error::CommitEditorFailed(status.code()));
-        }
-
-        if self.config.editor.ask_confirm {
-            print!("Press enter to commit: ");
-            io::stdout().flush()?;
-            io::stdin().read_line(&mut String::new())?;
-        }
+        self.open_interactive(&path)?;
 
         let content = fs::read_to_string(&path)?;
 
@@ -387,6 +390,79 @@ impl FL {
         }
 
         Ok(())
+    }
+
+    // NOTE: this does not update the [`FL::config`] field
+    pub fn set_config_key(&mut self, key: &str, value: &str) -> Result<()> {
+        let config_content = fs::read_to_string(self.config_path())?;
+
+        let mut doc: toml_edit::DocumentMut = config_content.parse()?;
+        // doc[key] = value.parse().unwrap_or_else(|_| toml_edit::value(value));
+
+        // parse value as toml value (like string or bool), and if that fails treat it as a string
+        let val = value.parse().unwrap_or_else(|_| toml_edit::value(value));
+        let val_str = val.to_string();
+
+        let err = set_or_create(&mut doc, key, val);
+        if let Err(e) = err {
+            return Err(Error::TomlSetError {
+                key: key.to_string(),
+                value: val_str,
+                source: e,
+            });
+        };
+
+        let new_content = doc.to_string();
+        // make sure that the new config is valid
+        // toml::from_str::<config::Config>(&new_content)?;
+        if let Err(e) = toml::from_str::<config::Config>(&new_content) {
+            println!("Error Detected, not updating config");
+            return Err(e.into());
+        }
+
+        fs::write(self.config_path(), new_content)?;
+
+        println!("Successfully updated config: {key} = {val_str}");
+        Ok(())
+    }
+
+    pub fn open_interactive<P: AsRef<Path>>(&self, file: P) -> Result<()> {
+        let editor = self.config.editor.editor()?;
+        let args = self.config.editor.args()?;
+
+        let status = process::Command::new(&editor)
+            .args(&args)
+            .arg(file.as_ref())
+            .status()
+            .map_err(|_| Error::CommandNotFound(editor))?;
+
+        if !status.success() {
+            return Err(Error::CommitEditorFailed(status.code()));
+        }
+
+        if self.config.editor.ask_confirm {
+            print!("Press enter to continue: ");
+            io::stdout().flush()?;
+            io::stdin().read_line(&mut String::new())?;
+        }
+
+        Ok(())
+    }
+
+    pub fn fl_path(&self) -> PathBuf {
+        self.root.join(".fl")
+    }
+
+    pub fn history_path(&self) -> PathBuf {
+        self.fl_path().join("history")
+    }
+
+    pub fn stage_path(&self) -> PathBuf {
+        self.fl_path().join("STAGE.json")
+    }
+
+    pub fn config_path(&self) -> PathBuf {
+        self.fl_path().join("config.toml")
     }
 }
 
@@ -590,18 +666,6 @@ impl FL {
         actions
     }
 
-    fn fl_path(&self) -> PathBuf {
-        self.root.join(".fl")
-    }
-
-    fn history_path(&self) -> PathBuf {
-        self.fl_path().join("history")
-    }
-
-    fn stage_path(&self) -> PathBuf {
-        self.fl_path().join("STAGE.json")
-    }
-
     /// returns the path to a history file based on its index
     /// This does not check if the file exists, it just converts a number to a path
     /// To get a valid path, use `to_valid_history_index`
@@ -657,6 +721,59 @@ impl FL {
         fl.set_use_progress_bar(true); // show progress bar, so that user knows how much to wait
         fl
     }
+}
+
+/// set a key to a value, but this works with nested tables using `.`
+fn set_or_create(
+    doc: &mut toml_edit::DocumentMut,
+    key: &str,
+    val: toml_edit::Item,
+) -> Result<(), TomlSetError> {
+    // this would work if I didn't have the `.` syntax...
+    // doc[key] = val;
+
+    let mut parts = key.split('.');
+    // The part of key that we are currently working on, for error messages
+    let mut path = String::new();
+
+    let mut table = doc
+        .as_item_mut()
+        .as_table_like_mut()
+        .expect("doc root is not a table");
+
+    // All segments except the last are intermediate tables
+    // Since split always returns at least one element, .ok_or code is basically unreachable
+    let last_key = parts.next_back().ok_or(TomlSetError::EmptyKey)?;
+
+    for segment in parts {
+        path.push_str(segment);
+
+        if let Some(inner_table) = table
+            .entry(segment)
+            .or_insert(toml_edit::table())
+            .as_table_like_mut()
+        {
+            table = inner_table;
+            path.push('.');
+        // if segment is not a table, e.g. `a = 1`, `a.b` is invalid
+        } else {
+            return Err(TomlSetError::NotTable(path));
+        }
+    }
+
+    // if i just insert here, it will add it as new key and thus remove all existing comments for that key
+    // table.insert(last_key, val);
+    match table.entry(last_key) {
+        // Only change the value, key is unchanged so it keeps all the comments
+        toml_edit::Entry::Occupied(mut o) => {
+            *o.get_mut() = val;
+        }
+        // if it doesn't exist, then create it (insert will)
+        toml_edit::Entry::Vacant(v) => {
+            v.insert(val);
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
