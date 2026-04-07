@@ -11,6 +11,7 @@
 - [ ] Add a way to ignore files/folders, like `.gitignore`
 - [ ] Add a `config` command, that stores some config options
 - [ ] Allow a global `~/.config/fl/config.toml` config (use `config` crate)
+- [ ] Make `config reset` work even if the current config file is broken
 
 ## Bugs / Improvements
 
@@ -18,6 +19,7 @@
 - [ ] maybe store history paths in hex numbers instead of regular numbers (`{:08x}`)
 - [ ] Don't panic when `.fl/` folder is invalid (does not contain `history/`, or has weird permissions)
 - [ ] Add meaningful exit codes (instead of using raw_os_error)
+- [ ] Maybe make config.rs handle all of the get/set toml stuff with its own errors
 
 ## Done
 

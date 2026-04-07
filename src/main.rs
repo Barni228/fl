@@ -54,7 +54,8 @@ fn main() -> anyhow::Result<()> {
         }
         Some(("config", sub)) => match sub.subcommand() {
             Some(("default", _)) => {
-                println!("{}", fl::config::DEFAULT_CONFIG);
+                // don't print a new line at the end, so that the file is printed as is
+                print!("{}", fl::config::DEFAULT_CONFIG);
             }
             Some(("path", _)) => {
                 let config_path = FL::in_current_dir()?.config_path();
@@ -65,15 +66,23 @@ fn main() -> anyhow::Result<()> {
                 fl.open_interactive(fl.config_path())?;
             }
             Some(("get", sub)) => {
-                todo!();
+                let key = sub.get_one::<String>("KEY").unwrap();
+                println!("{}", FL::in_current_dir()?.get_config_key(key)?);
             }
             Some(("set", sub)) => {
+                let mut fl = FL::in_current_dir()?;
                 let key = sub.get_one::<String>("KEY").unwrap();
-                if let Some(value) = sub.get_one::<String>("VALUE") {
-                    FL::in_current_dir()?.set_config_key(key, value)?;
-                } else {
-                    todo!();
-                }
+                let value = sub.get_one::<String>("VALUE").unwrap();
+
+                // tell the user that config is not updated if there is an error
+                fl.set_config_key(key, value)
+                    .inspect_err(|_| println!("Error Detected, config not updated"))?;
+            }
+            Some(("reset", sub)) => {
+                let key = sub.get_one::<String>("KEY").unwrap();
+                let mut fl = FL::in_current_dir()?;
+                fl.reset_config_key(key)
+                    .inspect_err(|_| println!("Error Detected, config not updated"))?;
             }
             _ => {}
         },
@@ -90,11 +99,11 @@ fn get_clap_cmd() -> Command {
     command!()
         .arg_required_else_help(true)
         .args([
-            arg!(-u --update "Automatically update the repo, \
-                this will run `update` command, if the command you are running depends on it")
+            arg!(-u --update "Automatically update the repo, this will run \
+                             `update` command, if the command you are running depends on it")
             .overrides_with("no-update"),
             arg!(-U --"no-update" "Don't automatically update the repo, \
-             this just cancels out --update flag and has no effect on `update` command"),
+                       this just cancels out --update flag and has no effect on `update` command"),
         ])
         .subcommands([
             Command::new("init")
@@ -122,23 +131,29 @@ fn get_clap_cmd() -> Command {
                 .about("Commit changes")
                 .alias("c")
                 .args([
-                    arg!([MESSAGE] "Commit message, first line will be used as title while all other lines will be used as body"),
+                    arg!([MESSAGE] "Commit message, first line will be used as title, \
+                        while all other lines will be used as body"),
                     arg!(-e --empty "Commit with no message"),
                 ]),
             Command::new("log").about("Print history log").alias("l"),
-            Command::new("config").about("Edit fl config file").aliases(["conf", "cfg"]).subcommands([
-                Command::new("default").about("Print default fl config file"),
-                Command::new("path").about("Print path to fl config file"),
-                Command::new("open").about("Open fl config file in editor"),
-                Command::new("get")
-                    .about("Get a key from fl config file")
-                    //  TODO: maybe leave empty to print all
-                    .arg(arg!(<KEY> "Key")),
-                Command::new("set")
-                    .about("Set a key in fl config file")
-                    .arg(arg!(<KEY> "Key"))
-                    .arg(arg!([VALUE] "Value, leave empty to reset to default")),
-            ]),
+            Command::new("config")
+                .about("Edit fl config file")
+                .aliases(["conf", "cfg"])
+                .subcommands([
+                    Command::new("default").about("Print default fl config file"),
+                    Command::new("path").about("Print path to fl config file"),
+                    Command::new("open").about("Open fl config file in editor"),
+                    Command::new("get")
+                        .about("Get a key from fl config file")
+                        .arg(arg!(<KEY> "Key")),
+                    Command::new("set")
+                        .about("Set a key in fl config file")
+                        .arg(arg!(<KEY> "Key to modify"))
+                        .arg(arg!(<VALUE> "The new value")),
+                    Command::new("reset")
+                        .about("Reset a key to its default value")
+                        .arg(arg!(<KEY> "Key to reset to default")),
+                ]),
             Command::new("pwd")
                 .about("Print the current fl repo path")
                 .alias("p"),

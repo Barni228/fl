@@ -14,6 +14,7 @@ use std::{
 pub mod commit;
 pub mod config;
 mod rename_detection;
+mod toml_helper;
 
 /// Alias for a `Result` with the error type [`crate::Error`]
 pub type Result<T, E = Error> = std::result::Result<T, E>;
@@ -27,11 +28,23 @@ pub enum Error {
     #[error("Failed to parse config")]
     InvalidConfig(#[from] toml::de::Error),
 
-    #[error("Failed to set `{key}` to `{value}`")]
-    TomlSetError {
+    #[error("Failed to set `{key}` to `{value}` in config file")]
+    ConfigSetError {
         key: String, // full name of the thing to set ("a.b", "a.b" will be the String)
         value: String,
-        source: TomlSetError,
+        source: toml_helper::TomlSetError,
+    },
+
+    #[error("Failed to get `{key}` in config file")]
+    ConfigGerError {
+        key: String,
+        source: toml_helper::TomlGetError,
+    },
+
+    #[error("Unrecognized key `{key}`, could not find a default value for it")]
+    ConfigResetError {
+        key: String,
+        source: toml_helper::TomlGetError,
     },
 
     #[error("Failed to parse config with toml_edit")]
@@ -54,15 +67,6 @@ pub enum Error {
 
     #[error("Commit Editor exited with non-zero status: {0:?}")]
     CommitEditorFailed(Option<i32>),
-}
-
-#[derive(thiserror::Error, Debug)]
-pub enum TomlSetError {
-    #[error("`{0}` is not a table")]
-    NotTable(String), // name of the thing that is not table (`a.b`, "a" will be the String)
-
-    #[error("Empty Key")]
-    EmptyKey,
 }
 
 /// Represents a change detected between two file snapshots.
@@ -392,38 +396,62 @@ impl FL {
         Ok(())
     }
 
-    // NOTE: this does not update the [`FL::config`] field
     pub fn set_config_key(&mut self, key: &str, value: &str) -> Result<()> {
+        let val = value.parse().unwrap_or_else(|_| toml_edit::value(value));
+
+        self.set_config_key_value(key, val)
+    }
+
+    pub fn set_config_key_value(&mut self, key: &str, value: toml_edit::Item) -> Result<()> {
         let config_content = fs::read_to_string(self.config_path())?;
 
         let mut doc: toml_edit::DocumentMut = config_content.parse()?;
-        // doc[key] = value.parse().unwrap_or_else(|_| toml_edit::value(value));
 
         // parse value as toml value (like string or bool), and if that fails treat it as a string
-        let val = value.parse().unwrap_or_else(|_| toml_edit::value(value));
-        let val_str = val.to_string();
+        let value_str = value.to_string();
 
-        let err = set_or_create(&mut doc, key, val);
+        let err = toml_helper::set_key(&mut doc, key, value);
         if let Err(e) = err {
-            return Err(Error::TomlSetError {
+            return Err(Error::ConfigSetError {
                 key: key.to_string(),
-                value: val_str,
+                value: value_str,
                 source: e,
             });
         };
 
         let new_content = doc.to_string();
         // make sure that the new config is valid
-        // toml::from_str::<config::Config>(&new_content)?;
-        if let Err(e) = toml::from_str::<config::Config>(&new_content) {
-            println!("Error Detected, not updating config");
-            return Err(e.into());
-        }
+        self.config = toml::from_str::<config::Config>(&new_content)?;
 
         fs::write(self.config_path(), new_content)?;
 
-        println!("Successfully updated config: {key} = {val_str}");
+        println!("Successfully updated config:");
+        println!("{key} = {value_str}");
         Ok(())
+    }
+
+    pub fn reset_config_key(&mut self, key: &str) -> Result<()> {
+        let doc = config::DEFAULT_CONFIG.parse()?;
+        // if the key does not exist in DEFAULT_CONFIG, then return ResetError instead of regular GetError
+        let value = toml_helper::get_key(&doc, key).map_err(|e| Error::ConfigResetError {
+            key: key.to_string(),
+            source: e,
+        })?;
+
+        // this should always succeed, because key and value are both 100% valid
+        self.set_config_key_value(key, value)
+    }
+
+    pub fn get_config_key(&self, key: &str) -> Result<String> {
+        let config_content = fs::read_to_string(self.config_path())?;
+        let doc: toml_edit::Document<String> = config_content.parse()?;
+
+        let value = toml_helper::get_key(&doc, key).map_err(|e| Error::ConfigGerError {
+            key: key.to_string(),
+            source: e,
+        })?;
+
+        Ok(value.to_string())
     }
 
     pub fn open_interactive<P: AsRef<Path>>(&self, file: P) -> Result<()> {
@@ -690,11 +718,9 @@ impl FL {
     }
 
     fn find_root_path() -> Result<PathBuf> {
-        // let dir = env::current_dir().context("Failed to get current directory")?;
         let dir = env::current_dir()?;
 
         FL::find_fl_path(dir.clone()).ok_or(Error::RepoNotFound(dir))
-        // .context("fatal: not inside an fl repository (or any of the parent directories)")
     }
 
     fn find_fl_path(mut dir: PathBuf) -> Option<PathBuf> {
@@ -721,59 +747,6 @@ impl FL {
         fl.set_use_progress_bar(true); // show progress bar, so that user knows how much to wait
         fl
     }
-}
-
-/// set a key to a value, but this works with nested tables using `.`
-fn set_or_create(
-    doc: &mut toml_edit::DocumentMut,
-    key: &str,
-    val: toml_edit::Item,
-) -> Result<(), TomlSetError> {
-    // this would work if I didn't have the `.` syntax...
-    // doc[key] = val;
-
-    let mut parts = key.split('.');
-    // The part of key that we are currently working on, for error messages
-    let mut path = String::new();
-
-    let mut table = doc
-        .as_item_mut()
-        .as_table_like_mut()
-        .expect("doc root is not a table");
-
-    // All segments except the last are intermediate tables
-    // Since split always returns at least one element, .ok_or code is basically unreachable
-    let last_key = parts.next_back().ok_or(TomlSetError::EmptyKey)?;
-
-    for segment in parts {
-        path.push_str(segment);
-
-        if let Some(inner_table) = table
-            .entry(segment)
-            .or_insert(toml_edit::table())
-            .as_table_like_mut()
-        {
-            table = inner_table;
-            path.push('.');
-        // if segment is not a table, e.g. `a = 1`, `a.b` is invalid
-        } else {
-            return Err(TomlSetError::NotTable(path));
-        }
-    }
-
-    // if i just insert here, it will add it as new key and thus remove all existing comments for that key
-    // table.insert(last_key, val);
-    match table.entry(last_key) {
-        // Only change the value, key is unchanged so it keeps all the comments
-        toml_edit::Entry::Occupied(mut o) => {
-            *o.get_mut() = val;
-        }
-        // if it doesn't exist, then create it (insert will)
-        toml_edit::Entry::Vacant(v) => {
-            v.insert(val);
-        }
-    }
-    Ok(())
 }
 
 #[cfg(test)]
