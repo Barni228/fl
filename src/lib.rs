@@ -253,10 +253,7 @@ impl FL {
         let second = max(valid_a, valid_b);
 
         println!("Diffing {first} and {second}");
-        self.diff_paths(
-            &self.history_file_path(first),
-            &self.history_file_path(second),
-        )?;
+        self.diff_commits(&self.get_commit(first)?, &self.get_commit(second)?);
         Ok(())
     }
 
@@ -284,8 +281,8 @@ impl FL {
             println!("Diffing {valid_commit} and STAGE");
             Commit::from_path(self.history_file_path(valid_commit))?
         };
-        let actions = FL::diff_commit(&target_commit, &stage);
-        self.print_actions(&actions);
+        self.diff_commits(&target_commit, &stage);
+
         Ok(())
     }
 
@@ -299,12 +296,36 @@ impl FL {
     /// Commit the STAGE file, with a commit message
     /// First line of the message will be used as the title, the rest as the body
     pub fn commit_message(&mut self, message: &str) -> Result<()> {
-        let (title, body) = message
-            .split_once('\n')
-            .map(|(t, b)| (t.trim_end(), b.trim()))
-            .unwrap_or((message, ""));
+        let mut lines = message
+            .lines()
+            // filter out comments
+            .filter(|l| !l.trim_start().starts_with('#'))
+            // remove whitespace at the end of each line
+            .map(|l| l.trim_end());
 
-        self.commit_title_body(title.to_string(), body.to_string())
+        // title is the first non-empty line
+        let title = lines.find(|l| !l.is_empty()).unwrap_or_default().trim();
+
+        let everything_after = lines.collect::<Vec<_>>().join("\n");
+        // remove empty new lines before and after the body
+        let body = everything_after.trim();
+
+        if title.is_empty() {
+            self.commit_empty()
+        } else if body.is_empty() {
+            self.commit_title(title.to_string())
+        } else {
+            self.commit_title_body(title.to_string(), body.to_string())
+        }
+    }
+
+    /// Commit the STAGE file, with a only a title
+    pub fn commit_title(&mut self, title: String) -> Result<()> {
+        let mut stage = Commit::from_path(self.stage_path())?;
+        // only set the title, leave body None
+        stage.title = Some(title);
+        stage.set_timestamp_now();
+        self.commit_commit(&stage)
     }
 
     /// Commit the STAGE file, with a title and body
@@ -328,24 +349,18 @@ impl FL {
 
         self.open_interactive(&path)?;
 
-        let content = fs::read_to_string(&path)?;
+        let message = fs::read_to_string(&path)?;
 
         let _ = fs::remove_file(&path);
 
-        let cleaned = content
-            .lines()
-            // filter out comments
-            .filter(|l| !l.trim_start().starts_with('#'))
-            .collect::<Vec<_>>()
-            .join("\n")
-            .trim()
-            .to_string();
+        self.commit_message(&message)
+    }
 
-        if cleaned.is_empty() {
-            self.commit_empty()
-        } else {
-            self.commit_message(&cleaned)
-        }
+    pub fn get_commit(&self, commit: i32) -> Result<Commit> {
+        let valid_commit = self.to_valid_history_index(commit)?;
+        let path = self.history_file_path(valid_commit);
+        let commit = Commit::from_path(&path)?;
+        Ok(commit)
     }
 
     pub fn print_short_log(&self) -> Result<()> {
@@ -375,7 +390,7 @@ impl FL {
                     } else {
                         Commit::default()
                     };
-                    let num_changes = FL::diff_commit(&prev_commit, &commit).len();
+                    let num_changes = FL::diff_actions_commit(&prev_commit, &commit).len();
                     format!(" ({num_changes} Changes)")
                 }
                 false => "".to_string(),
@@ -561,7 +576,7 @@ impl FL {
             Commit::default()
         };
 
-        let changes = FL::diff_commit(&prev_commit, commit).len();
+        let changes = FL::diff_actions_commit(&prev_commit, commit).len();
         println!("Committing {} changes", changes);
 
         commit.save_to(out_path)?;
@@ -569,12 +584,9 @@ impl FL {
         Ok(())
     }
 
-    fn diff_paths(&self, old: &Path, new: &Path) -> Result<(), commit::CommitError> {
-        let old = Commit::from_path(old)?;
-        let new = Commit::from_path(new)?;
-        let actions = FL::diff_commit(&old, &new);
+    fn diff_commits(&self, old: &Commit, new: &Commit) {
+        let actions = FL::diff_actions_commit(old, new);
         self.print_actions(&actions);
-        Ok(())
     }
 
     fn print_actions(&self, actions: &[Action]) {
@@ -598,7 +610,7 @@ impl FL {
         }
     }
 
-    fn diff_commit<'a>(old: &'a Commit, new: &'a Commit) -> Vec<Action<'a>> {
+    fn diff_actions_commit<'a>(old: &'a Commit, new: &'a Commit) -> Vec<Action<'a>> {
         // convert `BTreeMap<PathBuf, String>` to `HashMap<&Path, &str>`
         let old_by_path: HashMap<&Path, &str> =
             HashMap::from_iter(old.snapshot.iter().map(|(k, v)| (k.as_path(), v.as_str())));

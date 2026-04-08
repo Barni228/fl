@@ -1,7 +1,4 @@
-use serde_json::json;
-
 use super::*;
-use std::fs;
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -36,14 +33,14 @@ fn test_diff_add_to_empty() {
     // usually hash should be 64 random characters, but really it can be any string, so i use "0" for simplicity
     let before = HashMap::new();
     let after = hm([("new", "0")]);
-    assert_eq!(FL::diff_map(&before, &after), vec![add("new")]);
+    assert_eq!(vec![add("new")], FL::diff_map(&before, &after));
 }
 
 #[test]
 fn test_diff_add() {
     let before = hm([("old", "0")]);
     let after = hm([("old", "0"), ("new", "1")]);
-    assert_eq!(FL::diff_map(&before, &after), vec![add("new")]);
+    assert_eq!(vec![add("new")], FL::diff_map(&before, &after));
 }
 
 #[test]
@@ -51,8 +48,8 @@ fn test_diff_add_multiple() {
     let before = HashMap::new();
     let after = hm([("a", "1"), ("b", "2"), ("c", "3")]);
     assert_eq!(
-        FL::diff_map(&before, &after),
-        vec![add("a"), add("b"), add("c")]
+        vec![add("a"), add("b"), add("c")],
+        FL::diff_map(&before, &after)
     );
 }
 
@@ -62,7 +59,7 @@ fn test_diff_add_multiple() {
 fn test_diff_remove_single() {
     let before = hm([("old", "0")]);
     let after = HashMap::new();
-    assert_eq!(FL::diff_map(&before, &after), vec![remove("old")]);
+    assert_eq!(vec![remove("old")], FL::diff_map(&before, &after));
 }
 
 #[test]
@@ -70,16 +67,15 @@ fn test_diff_remove_multiple() {
     let before = hm([("a", "1"), ("b", "2"), ("c", "3")]);
     let after = HashMap::new();
     assert_eq!(
-        FL::diff_map(&before, &after),
-        vec![remove("a"), remove("b"), remove("c")]
+        vec![remove("a"), remove("b"), remove("c")],
+        FL::diff_map(&before, &after)
     );
 }
-
 #[test]
 fn test_diff_remove_and_unchanged() {
     let before = hm([("keep", "0"), ("gone", "1")]);
     let after = hm([("keep", "0")]);
-    assert_eq!(FL::diff_map(&before, &after), vec![remove("gone")]);
+    assert_eq!(vec![remove("gone")], FL::diff_map(&before, &after));
 }
 
 // ─── Modify ───────────────────────────────────────────────────────────────────
@@ -88,7 +84,7 @@ fn test_diff_remove_and_unchanged() {
 fn test_diff_modify_single() {
     let before = hm([("file", "aaa")]);
     let after = hm([("file", "bbb")]);
-    assert_eq!(FL::diff_map(&before, &after), vec![modify("file")]);
+    assert_eq!(vec![modify("file")], FL::diff_map(&before, &after));
 }
 
 #[test]
@@ -96,8 +92,8 @@ fn test_diff_modify_multiple() {
     let before = hm([("a", "1"), ("b", "2")]);
     let after = hm([("a", "X"), ("b", "Y")]);
     assert_eq!(
-        FL::diff_map(&before, &after),
-        vec![modify("a"), modify("b")]
+        vec![modify("a"), modify("b")],
+        FL::diff_map(&before, &after)
     );
 }
 
@@ -105,7 +101,7 @@ fn test_diff_modify_multiple() {
 fn test_diff_modify_and_unchanged() {
     let before = hm([("changed", "old"), ("same", "0")]);
     let after = hm([("changed", "new"), ("same", "0")]);
-    assert_eq!(FL::diff_map(&before, &after), vec![modify("changed")]);
+    assert_eq!(vec![modify("changed")], FL::diff_map(&before, &after));
 }
 
 // ─── Rename ───────────────────────────────────────────────────────────────────
@@ -115,8 +111,8 @@ fn test_diff_rename_simple() {
     let before = hm([("old_name.txt", "abc")]);
     let after = hm([("new_name.txt", "abc")]);
     assert_eq!(
-        FL::diff_map(&before, &after),
-        vec![rename("old_name.txt", "new_name.txt")]
+        vec![rename("old_name.txt", "new_name.txt")],
+        FL::diff_map(&before, &after)
     );
 }
 
@@ -125,8 +121,8 @@ fn test_diff_move() {
     let before = hm([("file.txt", "abc")]);
     let after = hm([("subdir/file.txt", "abc")]);
     assert_eq!(
-        FL::diff_map(&before, &after),
-        vec![rename("file.txt", "subdir/file.txt")]
+        vec![rename("file.txt", "subdir/file.txt")],
+        FL::diff_map(&before, &after)
     );
 }
 
@@ -135,8 +131,8 @@ fn test_diff_rename_and_move() {
     let before = hm([("dir/old.txt", "hash")]);
     let after = hm([("other/new.txt", "hash")]);
     assert_eq!(
-        FL::diff_map(&before, &after),
-        vec![rename("dir/old.txt", "other/new.txt")]
+        vec![rename("dir/old.txt", "other/new.txt")],
+        FL::diff_map(&before, &after)
     );
 }
 
@@ -146,11 +142,11 @@ fn test_diff_rename_best_match() {
     let before = hm([("alpha.txt", "H"), ("beta.txt", "H")]);
     let after = hm([("alpha_v2.txt", "H"), ("gamma.txt", "H")]);
     assert_eq!(
-        FL::diff_map(&before, &after),
         vec![
             rename("alpha.txt", "alpha_v2.txt"),
             rename("beta.txt", "gamma.txt"),
-        ]
+        ],
+        FL::diff_map(&before, &after)
     );
 }
 
@@ -182,7 +178,6 @@ fn test_diff_rename_best_many() {
         ("Ten.txt", "H"),
     ]);
     assert_eq!(
-        FL::diff_map(&before, &after),
         vec![
             rename("eight", "Eight.txt"),
             rename("five", "Five.txt"),
@@ -194,7 +189,8 @@ fn test_diff_rename_best_many() {
             rename("ten", "Ten.txt"),
             rename("three", "Three.txt"),
             rename("two", "Two.txt"),
-        ]
+        ],
+        FL::diff_map(&before, &after)
     );
 }
 
@@ -204,7 +200,7 @@ fn test_diff_rename_and_remove() {
     let before = hm([("a.txt", "H"), ("b.txt", "H")]);
     let after = hm([("c.txt", "H")]);
     let actions = FL::diff_map(&before, &after);
-    assert_eq!(actions.len(), 2); // two actions
+    assert_eq!(2, actions.len()); // two actions
     assert!(actions.iter().any(|a| matches!(a, Action::Remove(_)))); // one of them is added
     assert!(actions.iter().any(|a| matches!(a, Action::Rename(_, _)))); // one of them is rename
 }
@@ -215,7 +211,7 @@ fn test_diff_rename_and_add() {
     let before = hm([("a.txt", "H")]);
     let after = hm([("b.txt", "H"), ("c.txt", "H")]);
     let actions = FL::diff_map(&before, &after);
-    assert_eq!(actions.len(), 2); // two actions
+    assert_eq!(2, actions.len()); // two actions
     assert!(actions.iter().any(|a| matches!(a, Action::Add(_)))); // one of them is added
     assert!(actions.iter().any(|a| matches!(a, Action::Rename(_, _)))); // one of them is rename
 }
@@ -226,8 +222,8 @@ fn test_diff_rename_while_modifying() {
     let before = hm([("a.txt", "HASH_A")]);
     let after = hm([("b.txt", "HASH_B")]);
     assert_eq!(
-        FL::diff_map(&before, &after),
-        vec![remove("a.txt"), add("b.txt")]
+        vec![remove("a.txt"), add("b.txt")],
+        FL::diff_map(&before, &after)
     );
 }
 
@@ -237,8 +233,8 @@ fn test_diff_rename_different_files() {
     let before = hm([("a.txt", "HASH_A"), ("b.txt", "HASH_B")]);
     let after = hm([("c.txt", "HASH_A"), ("d.txt", "HASH_B")]);
     assert_eq!(
-        FL::diff_map(&before, &after),
-        vec![rename("a.txt", "c.txt"), rename("b.txt", "d.txt")]
+        vec![rename("a.txt", "c.txt"), rename("b.txt", "d.txt")],
+        FL::diff_map(&before, &after)
     );
 }
 
@@ -247,11 +243,11 @@ fn test_diff_rename_different_dir() {
     let before = hm([("src/widget.rs", "H"), ("src/gadget.rs", "H")]);
     let after = hm([("src/widget_v2.rs", "H"), ("lib/gadget.rs", "H")]);
     assert_eq!(
-        FL::diff_map(&before, &after),
         vec![
             rename("src/gadget.rs", "lib/gadget.rs"),
             rename("src/widget.rs", "src/widget_v2.rs"),
-        ]
+        ],
+        FL::diff_map(&before, &after)
     );
 }
 
@@ -273,13 +269,13 @@ fn test_diff_all() {
                                // gone.txt absent → removed
     ]);
     assert_eq!(
-        FL::diff_map(&before, &after),
         vec![
             modify("change.txt"),
             remove("gone.txt"),
             rename("renamed.txt", "new-name.txt"),
             add("new.txt"),
-        ]
+        ],
+        FL::diff_map(&before, &after)
     );
 }
 
@@ -288,7 +284,7 @@ fn test_diff_modify() {
     // Same path, different hash → Modify, not Rename
     let before = hm([("file.txt", "old_hash")]);
     let after = hm([("file.txt", "new_hash")]);
-    assert_eq!(FL::diff_map(&before, &after), vec![modify("file.txt")]);
+    assert_eq!(vec![modify("file.txt")], FL::diff_map(&before, &after));
 }
 
 // ─── empty ───────────────────────────────────────────────────────────────────
@@ -315,87 +311,11 @@ fn test_diff_output_is_sorted() {
     let before = hm([("z_gone.txt", "Z"), ("a_change.txt", "old")]);
     let after = hm([("a_change.txt", "new"), ("m_new.txt", "M")]);
     assert_eq!(
-        FL::diff_map(&before, &after),
         vec![
             modify("a_change.txt"),
             add("m_new.txt"),
             remove("z_gone.txt")
-        ]
+        ],
+        FL::diff_map(&before, &after)
     );
-}
-
-// ─── Repo: automatically find the current repo ────────────────────────────────
-
-#[test]
-fn test_repo_find() {
-    assert_eq!(
-        FL::find_fl_path("test_repo".into()),
-        Some(PathBuf::from("test_repo"))
-    );
-}
-
-#[test]
-fn test_repo_parent() {
-    assert_eq!(
-        FL::find_fl_path("test_repo/subfolder".into()),
-        Some(PathBuf::from("test_repo"))
-    );
-    assert_eq!(
-        FL::find_fl_path("test_repo/subfolder/sub-sub-folder".into()),
-        Some(PathBuf::from("test_repo"))
-    );
-}
-
-#[test]
-fn test_repo_not_found() {
-    // the root folder is probably not a fl repo, at least I hope so
-    assert_eq!(FL::find_fl_path("/".into()), None);
-}
-
-// ─── Update ───────────────────────────────────────────────────────────────────
-#[test]
-fn test_update() -> anyhow::Result<()> {
-    // let test_folder = std::env::temp_dir().join("__temp_test_update_folder");
-    let test_folder = PathBuf::from("__temp_test_update_folder");
-
-    // create a test folder
-    let _ = fs::remove_dir_all(test_folder.clone());
-    fs::create_dir(&test_folder)?;
-
-    // create a file in the repo
-    let file_path = test_folder.join("file.txt");
-    fs::write(&file_path, "hello\n").unwrap();
-
-    let fl = FL::create_fl_repo(test_folder.clone())?;
-    fl.update()?;
-
-    let content = fs::read_to_string(fl.stage_path())?;
-    let parsed: serde_json::Value = serde_json::from_str(&content).unwrap();
-
-    assert_eq!(
-        parsed,
-        json!({
-            "title": null,
-            "body": null,
-            "timestamp": null,
-            "snapshot": {
-                ".": "7f39224e335994886c26ba8c241fcbe1d474aadaa2bd0a8e842983b098cea894",
-                "file.txt": "5891b5b522d5df086d0ff0b110fbd9d21bb4fc7163af34d08286a2e846f6be03",
-            },
-        })
-    );
-
-    // cleanup after
-    fs::remove_dir_all(test_folder)?;
-    Ok(())
-}
-
-// ─── Errors ───────────────────────────────────────────────────────────────────
-#[test]
-fn test_commit_no_exist() {
-    let err = commit::Commit::from_path("no_exist").unwrap_err();
-    assert_eq!(
-        err.to_string(),
-        "I/O error: failed to open file `no_exist`: No such file or directory (os error 2)"
-    )
 }

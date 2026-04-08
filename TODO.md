@@ -12,6 +12,7 @@
 - [ ] Add a `config` command, that stores some config options
 - [ ] Allow a global `~/.config/fl/config.toml` config (use `config` crate)
 - [ ] Make `config reset` work even if the current config file is broken
+- [ ] Make interactive commit save file in fl repo rather than temp file, like `git` (git also doesn't remove it)
 
 ## Bugs / Improvements
 
