@@ -10,17 +10,16 @@ fn main() -> anyhow::Result<()> {
             FL::init()?;
         }
         Some(("update", _)) => {
-            FL::in_current_dir()?.update()?;
+            let fl = FL::in_current_dir()?;
+            println!("Updating {}", fl.root().display());
+            fl.update()?;
         }
         Some(("status", _)) => {
-            let mut fl = FL::in_current_dir()?;
+            let fl = FL::in_current_dir()?;
             if auto_update {
                 fl.update()?;
             }
-            // Don't print dir changes, because it will print the files that got changed anyway
-            // This will make it feel more like `git status`
-            fl.ignore_dir_modifications = true;
-            fl.diff_stage(-1)?;
+            fl.status()?;
         }
         Some(("diff", sub)) => {
             let fl = FL::in_current_dir()?;
@@ -119,7 +118,7 @@ fn get_clap_cmd() -> Command {
                 .about("Print what has changed between 2 commits")
                 .alias("d")
                 .args([
-                    arg!([FIRST] "First commit")
+                    arg!([FIRST] "First commit (can be negative)")
                         .default_value("-1")
                         .value_parser(value_parser!(i32))
                         .allow_negative_numbers(true),

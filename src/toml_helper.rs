@@ -13,6 +13,7 @@ pub enum TomlGetError {
     KeyNotFound(String),
 }
 
+// ignore because toml_helper is not public
 /// set a key to a value, but this works with nested tables using `.`
 /// ```ignore
 /// let t = "a = true";

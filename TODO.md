@@ -13,10 +13,11 @@
 - [ ] Allow a global `~/.config/fl/config.toml` config (use `config` crate)
 - [ ] Make `config reset` work even if the current config file is broken
 - [ ] Make interactive commit save file in fl repo rather than temp file, like `git` (git also doesn't remove it)
+- [ ] Add auto update by default option in config, so that `--update` flag could be enabled by default
+- [ ] Make `config set editor.command "code -w"` work (`command = ["code", "-w"]`)
 
 ## Bugs / Improvements
 
-- [ ] Add more tests, to test things other than `diff`
 - [ ] maybe store history paths in hex numbers instead of regular numbers (`{:08x}`)
 - [ ] Don't panic when `.fl/` folder is invalid (does not contain `history/`, or has weird permissions)
 - [ ] Add meaningful exit codes (instead of using raw_os_error)
@@ -24,6 +25,7 @@
 
 ## Done
 
+- [x] Add more tests, to test things other than `diff`
 - [x] Use custom error types instead of `anyhow::Result`
 - [x] maybe remove dead code from `fs_helper.rs`
 - [x] Improve Error handling, so I return `Result` instead of always exiting with error

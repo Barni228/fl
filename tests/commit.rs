@@ -14,8 +14,10 @@ fn test_commit_count() {
     let mut fl = FL::create_fl_repo(dir.path().to_path_buf()).unwrap();
     fs::write(dir.path().join("file.txt"), "hello").unwrap();
 
-    fl.commit_empty().unwrap();
-    assert_eq!(1, fl.commits());
+    for i in 1..=10 {
+        fl.commit_empty().unwrap();
+        assert_eq!(i, fl.commits());
+    }
 }
 
 #[test]

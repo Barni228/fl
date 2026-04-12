@@ -31,35 +31,49 @@ fn test_repo_not_found() {
     assert_eq!(None, FL::find_fl_path("/".into()));
 }
 
-// ─── Update ───────────────────────────────────────────────────────────────────
 #[test]
-fn test_update() -> anyhow::Result<()> {
+fn test_repo_structure() -> Result<(), Box<dyn std::error::Error>> {
+    fn list_dir(path: &Path) -> Vec<PathBuf> {
+        fs::read_dir(path)
+            .unwrap()
+            .map(|e| e.unwrap().path())
+            .map(|p| p.strip_prefix(path).unwrap().to_path_buf())
+            .collect()
+    }
+
     // create fl repo
-    let test_dir = tempfile::TempDir::new()?;
-    let fl = FL::create_fl_repo(test_dir.path().to_path_buf())?;
+    let dir = tempfile::TempDir::new()?;
+    // initially the repo is empty
+    assert!(fs::read_dir(dir.path())?.next().is_none());
 
-    // create a file in the repo
-    let file_path = test_dir.path().join("file.txt");
-    fs::write(&file_path, "hello\n").unwrap();
-
-    // Generate the STAGE snapshot
-    fl.update()?;
-
-    let content = fs::read_to_string(fl.stage_path())?;
-    let parsed: serde_json::Value = serde_json::from_str(&content).unwrap();
-
+    let fl = FL::create_fl_repo(dir.path().to_path_buf())?;
+    assert_eq!(vec![PathBuf::from(".fl")], list_dir(dir.path()));
+    assert_eq!(
+        vec![
+            PathBuf::from("history"),
+            PathBuf::from("config.toml"),
+            PathBuf::from("STAGE.json")
+        ],
+        list_dir(&dir.path().join(".fl"))
+    );
+    assert_eq!(
+        Vec::<PathBuf>::new(),
+        list_dir(&dir.path().join(".fl").join("history"))
+    );
+    assert_eq!(
+        config::DEFAULT_CONFIG,
+        fs::read_to_string(dir.path().join(".fl").join("config.toml"))?
+    );
     assert_eq!(
         json!({
             "title": null,
             "body": null,
             "timestamp": null,
-            "snapshot": {
-                ".": "7f39224e335994886c26ba8c241fcbe1d474aadaa2bd0a8e842983b098cea894",
-                "file.txt": "5891b5b522d5df086d0ff0b110fbd9d21bb4fc7163af34d08286a2e846f6be03",
-            },
+            "snapshot": {},
         }),
-        parsed
+        serde_json::from_str::<serde_json::Value>(&fs::read_to_string(fl.stage_path())?)?
     );
+
     Ok(())
 }
 

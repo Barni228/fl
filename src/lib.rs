@@ -50,7 +50,7 @@ pub enum Error {
     #[error("Failed to parse config with toml_edit")]
     InvalidConfigEdit(#[from] toml_edit::TomlError),
 
-    #[error("fatal: Invalid commit index: {index} (must be between {min} and {max})", min = -max-1)]
+    #[error("fatal: Invalid commit index: {index} ({})", if *max == -1 { "no commits exist".to_string() } else { format!("must be between {min} and {max}", min = -max - 1) })]
     CommitNotFound { index: i32, max: i32 },
 
     #[error("Failed to parse commit from json")]
@@ -144,10 +144,6 @@ pub struct FL {
     commits: i32,
     /// Config options
     pub config: config::Config,
-
-    // TODO: this is too niche to be in config, make it a filter when you add filters
-    /// if true, add `diff` commands will ignore modifications on directories
-    pub ignore_dir_modifications: bool,
 }
 
 // Constructors
@@ -167,7 +163,6 @@ impl FL {
             root,
             commits: 0,
             config,
-            ignore_dir_modifications: false,
         };
         fl.update_commits()?;
         Ok(fl)
@@ -226,11 +221,25 @@ impl FL {
         let mut fl = self.get_filelist();
         let mut commit = commit::Commit::default();
         let output = self.stage_path();
-        println!("Updating {}", self.root.display());
 
         commit.snapshot = fl.hash_paths(&[&self.root]);
 
         commit.save_to(output)
+    }
+
+    pub fn status(&self) -> Result<()> {
+        let stage = Commit::from_path(self.stage_path())?;
+        let last_commit = match self.commits {
+            0 => commit::Commit::default(),
+            _ => self.get_commit(self.commits - 1)?,
+        };
+        let actions = FL::diff_actions_commit(&last_commit, &stage);
+
+        // Don't print dir changes, because it will print the files that got changed anyway
+        // This will make it feel more like `git status`
+        self.print_actions_ignore_dir_mod(&actions, true);
+
+        Ok(())
     }
 
     /// Compares two history snapshots and prints their differences.
@@ -590,13 +599,17 @@ impl FL {
     }
 
     fn print_actions(&self, actions: &[Action]) {
+        self.print_actions_ignore_dir_mod(actions, false);
+    }
+
+    fn print_actions_ignore_dir_mod(&self, actions: &[Action], ignore_dir_modifications: bool) {
         if actions.is_empty() {
             println!("No changes");
             return;
         }
 
         for action in actions {
-            if self.ignore_dir_modifications
+            if ignore_dir_modifications
                 && let Action::Modify(path) = action
                 && PathBuf::from(path).is_dir()
             {
