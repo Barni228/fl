@@ -1,5 +1,7 @@
 # When to use colors, possible values: "auto", "always", "never"
 colors = "auto"
+# if true, automatically remove the FL_COMMIT_MESSAGE file
+rm_commit_file = false
 
 [editor]
 # Editor to use, leave empty for default ("$EDITOR" if exists, or "vim" otherwise)

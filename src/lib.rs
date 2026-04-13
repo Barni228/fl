@@ -348,8 +348,7 @@ impl FL {
 
     /// Commit the STAGE file, but open an editor to write a commit message
     pub fn commit_interactive(&mut self) -> Result<()> {
-        let mut path = env::temp_dir();
-        path.push("FL_COMMIT_MESSAGE");
+        let path = self.fl_path().join("FL_COMMIT_MESSAGE");
 
         fs::write(
             &path,
@@ -360,7 +359,9 @@ impl FL {
 
         let message = fs::read_to_string(&path)?;
 
-        let _ = fs::remove_file(&path);
+        if self.config.rm_commit_file {
+            fs::remove_file(&path)?;
+        }
 
         self.commit_message(&message)
     }

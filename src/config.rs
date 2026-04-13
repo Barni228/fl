@@ -31,6 +31,7 @@ pub enum BetterEnvError {
 #[serde(deny_unknown_fields)]
 pub struct Config {
     pub colors: ColorOptions,
+    pub rm_commit_file: bool,
     pub editor: Editor,
     pub log: Log,
 }

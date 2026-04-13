@@ -9,10 +9,8 @@
 - [ ] Add `log --follow` command, that shows every commit that changed a specific file
 - [ ] Add a way to filter commits, like `-ad` for only add or delete actions
 - [ ] Add a way to ignore files/folders, like `.gitignore`
-- [ ] Add a `config` command, that stores some config options
 - [ ] Allow a global `~/.config/fl/config.toml` config (use `config` crate)
 - [ ] Make `config reset` work even if the current config file is broken
-- [ ] Make interactive commit save file in fl repo rather than temp file, like `git` (git also doesn't remove it)
 - [ ] Add auto update by default option in config, so that `--update` flag could be enabled by default
 - [ ] Make `config set editor.command "code -w"` work (`command = ["code", "-w"]`)
 
@@ -25,6 +23,8 @@
 
 ## Done
 
+- [x] Make interactive commit save file in fl repo rather than temp file, like `git` (git also doesn't remove it)
+- [x] Add a `config` command, that stores some config options
 - [x] Add more tests, to test things other than `diff`
 - [x] Use custom error types instead of `anyhow::Result`
 - [x] maybe remove dead code from `fs_helper.rs`
