@@ -8,6 +8,7 @@ edition = "2024"
 anyhow = "1.0.102"
 clap = { version = "4.6.0", features = ["cargo"] }
 colored = "3.1.1"
+conf = { version = "0.15.22", package = "config", default-features = false, features = ["toml"] }
 filelist = { git = "https://github.com/Barni228/filelist", version = "0.2.0" }
 fs-err = "3.3.0"
 pathfinding = "4.15.0"
@@ -16,7 +17,6 @@ serde_json = "1.0.149"
 strsim = "0.11.1"
 thiserror = "2.0.18"
 time = { version = "0.3.47", features = ["serde-human-readable"] }
-toml = "1.1.2"
 toml_edit = "0.25.10"
 
 [dev-dependencies]

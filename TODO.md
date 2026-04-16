@@ -9,10 +9,10 @@
 - [ ] Add `log --follow` command, that shows every commit that changed a specific file
 - [ ] Add a way to filter commits, like `-ad` for only add or delete actions
 - [ ] Add a way to ignore files/folders, like `.gitignore`
-- [ ] Allow a global `~/.config/fl/config.toml` config (use `config` crate)
 - [ ] Make `config reset` work even if the current config file is broken
 - [ ] Add auto update by default option in config, so that `--update` flag could be enabled by default
 - [ ] Make `config set editor.command "code -w"` work (`command = ["code", "-w"]`)
+- [ ] Add `config --global set ...` which will set things on global config file (`~/.config/fl/config.toml`)
 
 ## Bugs / Improvements
 
@@ -20,9 +20,11 @@
 - [ ] Don't panic when `.fl/` folder is invalid (does not contain `history/`, or has weird permissions)
 - [ ] Add meaningful exit codes (instead of using raw_os_error)
 - [ ] Maybe make config.rs handle all of the get/set toml stuff with its own errors
+- [ ] Add tests to test if `config` actually works (both local and global)
 
 ## Done
 
+- [x] Allow a global `~/.config/fl/config.toml` config (use `config` crate)
 - [x] Make interactive commit save file in fl repo rather than temp file, like `git` (git also doesn't remove it)
 - [x] Add a `config` command, that stores some config options
 - [x] Add more tests, to test things other than `diff`

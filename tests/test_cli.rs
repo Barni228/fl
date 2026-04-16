@@ -571,12 +571,7 @@ fn test_cli_config_set_invalid_key_fails() {
 Error: Failed to parse config
 
 Caused by:
-    TOML parse error at line 28, column 2
-       |
-    28 | [nonexistent]
-       |  ^^^^^^^^^^^
     unknown field `nonexistent`, expected one of `colors`, `rm_commit_file`, `editor`, `log`
-    
 ",
         );
 }
@@ -593,12 +588,7 @@ fn test_cli_config_set_invalid_value_fails() {
 Error: Failed to parse config
 
 Caused by:
-    TOML parse error at line 16, column 7
-       |
-    16 | max = \"not_a_number\"
-       |       ^^^^^^^^^^^^^^
-    invalid type: string \"not_a_number\", expected u32
-    
+    invalid type: string \"not_a_number\", expected an integer for key `log.max`
 ",
         );
 }

@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::io::{self, IsTerminal};
+use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
 // All config options can be overridden via CLI arguments
 
@@ -10,9 +12,10 @@ use std::io::{self, IsTerminal};
 /// ```
 /// use fl::config::DEFAULT_CONFIG;
 /// use fl::config::Config;
+/// use std::str::FromStr;
 ///
 /// assert_eq!(
-///     toml::from_str::<Config>(DEFAULT_CONFIG).unwrap(),
+///     Config::from_str(DEFAULT_CONFIG).unwrap(),
 ///     Config::default()
 /// )
 /// ```
@@ -28,7 +31,7 @@ pub enum BetterEnvError {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(deny_unknown_fields)]
+#[serde(default, deny_unknown_fields)]
 pub struct Config {
     pub colors: ColorOptions,
     pub rm_commit_file: bool,
@@ -37,14 +40,14 @@ pub struct Config {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(deny_unknown_fields)]
+#[serde(default, deny_unknown_fields)]
 pub struct Editor {
     pub command: Vec<String>,
     pub ask_confirm: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(default, deny_unknown_fields)]
 pub struct Log {
     pub max: u32,
     pub print_title: bool,
@@ -79,7 +82,50 @@ impl Default for Log {
     }
 }
 
+impl FromStr for Config {
+    type Err = conf::ConfigError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Config::load_str(s, false)
+    }
+}
+
 impl Config {
+    pub fn load(local_path: &Path, use_global: bool) -> Result<Self, conf::ConfigError> {
+        let mut builder = conf::Config::builder();
+        builder = builder.add_source(conf::File::from(local_path).required(false));
+        if use_global {
+            builder = Self::handle_global(builder);
+        }
+
+        builder.build()?.try_deserialize()
+    }
+
+    pub fn load_str(config: &str, use_global: bool) -> Result<Self, conf::ConfigError> {
+        let mut builder = conf::Config::builder();
+        builder = builder.add_source(conf::File::from_str(config, conf::FileFormat::Toml));
+        if use_global {
+            builder = Self::handle_global(builder);
+        }
+        builder.build()?.try_deserialize()
+    }
+
+    fn handle_global(
+        builder: conf::ConfigBuilder<conf::builder::DefaultState>,
+    ) -> conf::ConfigBuilder<conf::builder::DefaultState> {
+        let global_config = env::var_os("FL_GLOBAL_CONFIG")
+            .map(|path| PathBuf::from(&path))
+            .or_else(|| {
+                env::home_dir().map(|home| home.join(".config").join("fl").join("config.toml"))
+            });
+
+        if let Some(path) = global_config {
+            builder.add_source(conf::File::from(path).required(false))
+        } else {
+            builder
+        }
+    }
+
     pub fn use_color(&self) -> bool {
         match self.colors {
             ColorOptions::Auto => io::stdout().is_terminal(),
@@ -130,9 +176,6 @@ mod tests {
 
     #[test]
     fn test_default_config() {
-        assert_eq!(
-            toml::from_str::<Config>(DEFAULT_CONFIG).unwrap(),
-            Config::default()
-        )
+        assert_eq!(Config::from_str(DEFAULT_CONFIG).unwrap(), Config::default())
     }
 }

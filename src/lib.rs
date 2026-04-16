@@ -1,15 +1,14 @@
-use crate::commit::Commit;
+use crate::{commit::Commit, config::Config};
 use colored::Colorize;
 use filelist::FileList;
 use fs_err as fs;
-use std::{
-    cmp::{max, min},
-    collections::HashMap,
-    env, fmt,
-    io::{self, Write},
-    path::{Path, PathBuf},
-    process,
-};
+use std::cmp::{max, min};
+use std::collections::HashMap;
+use std::env;
+use std::fmt;
+use std::io::{self, Write};
+use std::path::{Path, PathBuf};
+use std::process;
 
 pub mod commit;
 pub mod config;
@@ -26,7 +25,7 @@ pub enum Error {
 
     // NOTE: because anyhow already prints the inner `#[from]` error, I don't need to have `{0}`
     #[error("Failed to parse config")]
-    InvalidConfig(#[from] toml::de::Error),
+    InvalidConfig(#[from] conf::ConfigError),
 
     #[error("Failed to set `{key}` to `{value}` in config file")]
     ConfigSetError {
@@ -157,8 +156,7 @@ impl FL {
     /// # Arguments
     /// * `root` - Path to the directory containing the `.fl` folder.
     pub fn new(root: PathBuf) -> Result<FL> {
-        let config_text = fs::read_to_string(root.join(".fl").join("config.toml"))?;
-        let config = toml::from_str(&config_text)?;
+        let config = config::Config::load(&root.join(".fl").join("config.toml"), true)?;
         let mut fl = FL {
             root,
             commits: 0,
@@ -187,7 +185,10 @@ impl FL {
         fs::create_dir(root.join(".fl").join("history"))?;
         Commit::default().save_to(root.join(".fl").join("STAGE.json"))?;
 
-        fs::write(root.join(".fl").join("config.toml"), config::DEFAULT_CONFIG)?;
+        fs::write(
+            root.join(".fl").join("config.toml"),
+            "# TIP: run `fl config default` to see the default config\n",
+        )?;
 
         FL::new(root)
     }
@@ -446,7 +447,7 @@ impl FL {
 
         let new_content = doc.to_string();
         // make sure that the new config is valid
-        self.config = toml::from_str::<config::Config>(&new_content)?;
+        self.config = Config::load_str(&new_content, true)?;
 
         fs::write(self.config_path(), new_content)?;
 
