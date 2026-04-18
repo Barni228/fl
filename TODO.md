@@ -13,6 +13,8 @@
 - [ ] Add auto update by default option in config, so that `--update` flag could be enabled by default
 - [ ] Make `config set editor.command "code -w"` work (`command = ["code", "-w"]`)
 - [ ] Add `config --global set ...` which will set things on global config file (`~/.config/fl/config.toml`)
+- [ ] Add a way to disable global config in local config (like `use_global_config = false`)
+- [ ] Add a way to set every setting with --flags
 
 ## Bugs / Improvements
 
@@ -24,6 +26,7 @@
 
 ## Done
 
+- [x] Add a way to not load global config
 - [x] Allow a global `~/.config/fl/config.toml` config (use `config` crate)
 - [x] Make interactive commit save file in fl repo rather than temp file, like `git` (git also doesn't remove it)
 - [x] Add a `config` command, that stores some config options

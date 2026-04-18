@@ -155,8 +155,8 @@ impl FL {
     ///
     /// # Arguments
     /// * `root` - Path to the directory containing the `.fl` folder.
-    pub fn new(root: PathBuf) -> Result<FL> {
-        let config = config::Config::load(&root.join(".fl").join("config.toml"), true)?;
+    pub fn new(root: PathBuf, use_global: bool) -> Result<FL> {
+        let config = config::Config::load(&root.join(".fl").join("config.toml"), use_global)?;
         let mut fl = FL {
             root,
             commits: 0,
@@ -168,8 +168,8 @@ impl FL {
 
     /// Creates a new `FL` instance by locating a `.fl` repository
     /// starting from the current directory and walking up parent directories.
-    pub fn in_current_dir() -> Result<FL> {
-        let fl = FL::new(FL::find_root_path()?)?;
+    pub fn in_current_dir(use_global: bool) -> Result<FL> {
+        let fl = FL::new(FL::find_root_path()?, use_global)?;
         Ok(fl)
     }
 
@@ -190,7 +190,7 @@ impl FL {
             "# TIP: run `fl config default` to see the default config\n",
         )?;
 
-        FL::new(root)
+        FL::new(root, true)
     }
 
     /// Initializes a new `.fl` repository in the current working directory.
@@ -469,7 +469,10 @@ impl FL {
     }
 
     pub fn get_config_key(&self, key: &str) -> Result<String> {
-        let config_content = fs::read_to_string(self.config_path())?;
+        // convert self.config to toml string, from which I get the key, so global is automatically handled
+        let config_content =
+            toml::to_string(&self.config).expect("Config should alway be valid TOML");
+
         let doc: toml_edit::Document<String> = config_content.parse()?;
 
         let value = toml_helper::get_key(&doc, key).map_err(|e| Error::ConfigGerError {

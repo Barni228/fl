@@ -93,20 +93,21 @@ impl FromStr for Config {
 impl Config {
     pub fn load(local_path: &Path, use_global: bool) -> Result<Self, conf::ConfigError> {
         let mut builder = conf::Config::builder();
-        builder = builder.add_source(conf::File::from(local_path).required(false));
+        // load the global config first, only then load the local
         if use_global {
             builder = Self::handle_global(builder);
         }
+        builder = builder.add_source(conf::File::from(local_path).required(false));
 
         builder.build()?.try_deserialize()
     }
 
     pub fn load_str(config: &str, use_global: bool) -> Result<Self, conf::ConfigError> {
         let mut builder = conf::Config::builder();
-        builder = builder.add_source(conf::File::from_str(config, conf::FileFormat::Toml));
         if use_global {
             builder = Self::handle_global(builder);
         }
+        builder = builder.add_source(conf::File::from_str(config, conf::FileFormat::Toml));
         builder.build()?.try_deserialize()
     }
 
@@ -176,6 +177,18 @@ mod tests {
 
     #[test]
     fn test_default_config() {
-        assert_eq!(Config::from_str(DEFAULT_CONFIG).unwrap(), Config::default())
+        assert_eq!(Config::default(), Config::from_str(DEFAULT_CONFIG).unwrap())
+    }
+
+    /// make sure that [`DEFAULT_CONFIG`] explicitly defines all options
+    #[test]
+    fn test_default_is_same() {
+        let default_toml: toml::Value = toml::from_str(DEFAULT_CONFIG).unwrap();
+        let generated_toml = toml::Value::try_from(Config::default()).unwrap();
+
+        assert_eq!(
+            default_toml, generated_toml,
+            "DEFAULT_CONFIG is not up to date"
+        );
     }
 }

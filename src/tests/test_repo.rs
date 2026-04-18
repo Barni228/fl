@@ -61,7 +61,7 @@ fn test_repo_structure() -> Result<(), Box<dyn std::error::Error>> {
         list_dir(&dir.path().join(".fl").join("history"))
     );
     assert_eq!(
-        config::DEFAULT_CONFIG,
+        "# TIP: run `fl config default` to see the default config\n",
         fs::read_to_string(dir.path().join(".fl").join("config.toml"))?
     );
     assert_eq!(

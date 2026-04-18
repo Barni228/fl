@@ -25,7 +25,10 @@ where
     Command::cargo_bin("fl")
         .unwrap()
         .current_dir(dir)
+        .arg("--no-global-config")
         .args(args)
+        // clear env vars, so RUST_BACKTRACE is not set (if it is, errors will be messed up)
+        .env_clear()
         .assert()
 }
 
@@ -45,7 +48,7 @@ fn test_cli_init() {
         cmd(dir.path(), [init_cmd]).success();
 
         // there should be a valid fl repo at that path
-        FL::new(dir.path().to_path_buf()).unwrap();
+        FL::new(dir.path().to_path_buf(), false).unwrap();
     }
 }
 
@@ -66,7 +69,7 @@ fn test_cli_update() {
         fs::write(dir.path().join("file.txt"), "hello").unwrap();
         cmd(dir.path(), [update_cmd]).success();
 
-        let fl = FL::new(dir.path().to_path_buf()).unwrap();
+        let fl = FL::new(dir.path().to_path_buf(), false).unwrap();
         let stage = Commit::from_path(fl.stage_path()).unwrap();
 
         assert_eq!(
@@ -92,7 +95,7 @@ fn test_cli_commit() {
         let dir = new_repo();
         cmd(dir.path(), [commit_cmd, "title"]).success();
 
-        let fl = FL::new(dir.path().to_path_buf()).unwrap();
+        let fl = FL::new(dir.path().to_path_buf(), false).unwrap();
         assert_eq!(1, fl.commits());
 
         let commit = fl.get_commit(-1).unwrap();
@@ -114,7 +117,7 @@ fn test_cli_commit_empty_flag() {
         let dir = new_repo();
         cmd(dir.path(), ["commit", empty_flag]).success();
 
-        let fl = FL::new(dir.path().to_path_buf()).unwrap();
+        let fl = FL::new(dir.path().to_path_buf(), false).unwrap();
         assert_eq!(1, fl.commits());
         let commit = fl.get_commit(0).unwrap();
         assert_eq!(
@@ -134,7 +137,7 @@ fn test_cli_commit_with_body() {
     let dir = new_repo();
     cmd(dir.path(), ["commit", "title\nbody line"]).success();
 
-    let fl = FL::new(dir.path().to_path_buf()).unwrap();
+    let fl = FL::new(dir.path().to_path_buf(), false).unwrap();
     let commit = fl.get_commit(0).unwrap();
     assert_eq!(
         Commit {
@@ -155,7 +158,7 @@ fn test_cli_commit_increments_count() {
         cmd(dir.path(), ["commit", "-e"]).success();
     }
 
-    let fl = FL::new(dir.path().to_path_buf()).unwrap();
+    let fl = FL::new(dir.path().to_path_buf(), false).unwrap();
     assert_eq!(3, fl.commits());
 }
 
@@ -164,7 +167,7 @@ fn test_cli_commit_timestamp() {
     let dir = new_repo();
     cmd(dir.path(), ["commit", "-e"]).success();
 
-    let fl = FL::new(dir.path().to_path_buf()).unwrap();
+    let fl = FL::new(dir.path().to_path_buf(), false).unwrap();
     let commit = fl.get_commit(0).unwrap();
 
     let now = time::OffsetDateTime::now_utc();
@@ -183,7 +186,7 @@ fn test_cli_auto_update() {
         // -u should automatically run `update` command before doing the commit
         cmd(dir.path(), [update_flag, "commit", "-e"]).success();
 
-        let fl = FL::new(dir.path().to_path_buf()).unwrap();
+        let fl = FL::new(dir.path().to_path_buf(), false).unwrap();
         assert_eq!(1, fl.commits());
 
         let commit = fl.get_commit(-1).unwrap();
@@ -210,7 +213,7 @@ fn test_cli_no_update_cancels_update() {
     // -U should cancel out -u, because it is more recent
     cmd(dir.path(), ["-u", "-U", "commit", "-e"]).success();
 
-    let fl = FL::new(dir.path().to_path_buf()).unwrap();
+    let fl = FL::new(dir.path().to_path_buf(), false).unwrap();
     // commit was made but snapshot is empty because update was NOT run
     let commit = fl.get_commit(0).unwrap();
     assert_eq!(
@@ -516,6 +519,12 @@ fn test_cli_config_get_nonexistent_key_fails() {
 fn test_cli_config_set() {
     let dir = new_repo();
 
+    fs::write(
+        dir.path().join(".fl").join("config.toml"),
+        config::DEFAULT_CONFIG,
+    )
+    .unwrap();
+
     cmd(dir.path(), ["config", "set", "log.max", "5"])
         .success()
         .stdout(
@@ -535,6 +544,12 @@ fn test_cli_config_set() {
 fn test_cli_config_set_bool() {
     let dir = new_repo();
 
+    fs::write(
+        dir.path().join(".fl").join("config.toml"),
+        config::DEFAULT_CONFIG,
+    )
+    .unwrap();
+
     cmd(dir.path(), ["config", "set", "log.print_title", "false"])
         .success()
         .stdout("Successfully updated config:\nlog.print_title = false\n");
@@ -547,6 +562,12 @@ fn test_cli_config_set_bool() {
 #[test]
 fn test_cli_config_set_str() {
     let dir = new_repo();
+
+    fs::write(
+        dir.path().join(".fl").join("config.toml"),
+        config::DEFAULT_CONFIG,
+    )
+    .unwrap();
 
     cmd(dir.path(), ["config", "set", "colors", "never"])
         .success()
@@ -563,6 +584,7 @@ fn test_cli_config_set_str() {
 #[test]
 fn test_cli_config_set_invalid_key_fails() {
     let dir = new_repo();
+
     cmd(dir.path(), ["config", "set", "nonexistent.key", "value"])
         .failure()
         .stdout("Error Detected, config not updated\n")
@@ -598,6 +620,12 @@ Caused by:
 #[test]
 fn test_cli_config_reset() {
     let dir = new_repo();
+
+    fs::write(
+        dir.path().join(".fl").join("config.toml"),
+        config::DEFAULT_CONFIG,
+    )
+    .unwrap();
 
     // change, then reset
     cmd(dir.path(), ["config", "set", "log.max", "99"]).success();
@@ -679,7 +707,7 @@ fn test_cli_full_workflow() {
     cmd(dir.path(), ["update"]).success();
     cmd(dir.path(), ["commit", "rename a to b"]).success();
 
-    let fl = FL::new(dir.path().to_path_buf()).unwrap();
+    let fl = FL::new(dir.path().to_path_buf(), false).unwrap();
     assert_eq!(3, fl.commits());
 
     // diff commit 0 → 1 should show a modification

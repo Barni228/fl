@@ -4,25 +4,26 @@ use fl::FL;
 fn main() -> anyhow::Result<()> {
     let matches = get_clap_cmd().get_matches();
     let auto_update = matches.get_flag("update");
+    let use_global = !matches.get_flag("no-global");
 
     match matches.subcommand() {
         Some(("init", _)) => {
             FL::init()?;
         }
         Some(("update", _)) => {
-            let fl = FL::in_current_dir()?;
+            let fl = FL::in_current_dir(use_global)?;
             println!("Updating {}", fl.root().display());
             fl.update()?;
         }
         Some(("status", _)) => {
-            let fl = FL::in_current_dir()?;
+            let fl = FL::in_current_dir(use_global)?;
             if auto_update {
                 fl.update()?;
             }
             fl.status()?;
         }
         Some(("diff", sub)) => {
-            let fl = FL::in_current_dir()?;
+            let fl = FL::in_current_dir(use_global)?;
             if auto_update {
                 fl.update()?;
             }
@@ -33,7 +34,7 @@ fn main() -> anyhow::Result<()> {
             }
         }
         Some(("commit", sub)) => {
-            let mut fl = FL::in_current_dir()?;
+            let mut fl = FL::in_current_dir(use_global)?;
             if auto_update {
                 fl.update()?;
             }
@@ -49,7 +50,7 @@ fn main() -> anyhow::Result<()> {
             }
         }
         Some(("log", _)) => {
-            FL::in_current_dir()?.print_short_log()?;
+            FL::in_current_dir(use_global)?.print_short_log()?;
         }
         Some(("config", sub)) => match sub.subcommand() {
             Some(("default", _)) => {
@@ -57,19 +58,19 @@ fn main() -> anyhow::Result<()> {
                 print!("{}", fl::config::DEFAULT_CONFIG);
             }
             Some(("path", _)) => {
-                let config_path = FL::in_current_dir()?.config_path();
+                let config_path = FL::in_current_dir(use_global)?.config_path();
                 println!("{}", config_path.display());
             }
             Some(("open", _)) => {
-                let fl = FL::in_current_dir()?;
+                let fl = FL::in_current_dir(use_global)?;
                 fl.open_interactive(fl.config_path())?;
             }
             Some(("get", sub)) => {
                 let key = sub.get_one::<String>("KEY").unwrap();
-                println!("{}", FL::in_current_dir()?.get_config_key(key)?);
+                println!("{}", FL::in_current_dir(use_global)?.get_config_key(key)?);
             }
             Some(("set", sub)) => {
-                let mut fl = FL::in_current_dir()?;
+                let mut fl = FL::in_current_dir(use_global)?;
                 let key = sub.get_one::<String>("KEY").unwrap();
                 let value = sub.get_one::<String>("VALUE").unwrap();
 
@@ -79,14 +80,14 @@ fn main() -> anyhow::Result<()> {
             }
             Some(("reset", sub)) => {
                 let key = sub.get_one::<String>("KEY").unwrap();
-                let mut fl = FL::in_current_dir()?;
+                let mut fl = FL::in_current_dir(use_global)?;
                 fl.reset_config_key(key)
                     .inspect_err(|_| println!("Error Detected, config not updated"))?;
             }
             _ => {}
         },
         Some(("pwd", _)) => {
-            println!("{}", FL::in_current_dir()?.root().display());
+            println!("{}", FL::in_current_dir(use_global)?.root().display());
         }
         _ => {}
     }
@@ -103,6 +104,7 @@ fn get_clap_cmd() -> Command {
             .overrides_with("no-update"),
             arg!(-U --"no-update" "Don't automatically update the repo, \
                        this just cancels out --update flag and has no effect on `update` command"),
+            arg!(--"no-global" "Don't load global config").alias("no-global-config"),
         ])
         .subcommands([
             Command::new("init")
