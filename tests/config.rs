@@ -1,6 +1,6 @@
 /// Tests that each config option is actually respected by the CLI.
 use assert_cmd::Command;
-use fl::FL;
+use fl::{FL, config};
 use predicates::prelude::*;
 use std::{fs, path::Path};
 
@@ -51,6 +51,29 @@ fn new_repo() -> tempfile::TempDir {
 /// Write `content` into `.fl/config.toml` inside `repo`.
 fn set_config(repo: &tempfile::TempDir, content: &str) {
     fs::write(repo.path().join(".fl").join("config.toml"), content).unwrap();
+}
+
+// functions
+
+#[test]
+fn test_config_set() {
+    let dir = new_repo();
+    let mut fl = FL::new(dir.path().to_path_buf(), false).unwrap();
+    // set something without setter
+    fl.config.log.max = 10;
+    fl.set_config_key("color", "never").unwrap();
+    assert_eq!(fl.config.color, config::ColorOptions::Never);
+    // log didn't change, since i did not set it
+    assert_eq!(fl.config.log.max, 10);
+}
+
+#[test]
+fn test_config_get() {
+    let dir = new_repo();
+    let mut fl = FL::new(dir.path().to_path_buf(), false).unwrap();
+    fl.config.log.max = 10;
+    assert_eq!(fl.get_config_key("log.max").unwrap(), "10");
+    assert_eq!(fl.config.log.max, 10);
 }
 
 // ─── color ────────────────────────────────────────────────────────────────────

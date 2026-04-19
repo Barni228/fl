@@ -21,11 +21,11 @@
 - [ ] maybe store history paths in hex numbers instead of regular numbers (`{:08x}`)
 - [ ] Don't panic when `.fl/` folder is invalid (does not contain `history/`, or has weird permissions)
 - [ ] Add meaningful exit codes (instead of using raw_os_error)
-- [ ] Maybe make config.rs handle all of the get/set toml stuff with its own errors
-- [ ] Bug: `config set` will set something, and then reload config, thus ignoring `-u` and `--no-global` flags
 
 ## Done
 
+- [x] Bug: `config set` will set something, and then reload config, thus ignoring `-u` and `--no-global` flags
+- [x] Maybe make config.rs handle all of the get/set toml stuff with its own errors
 - [x] Add auto update by default option in config, so that `--update` flag could be enabled by default
 - [x] Add tests to test if `config` actually works (both local and global)
 - [x] Add a way to not load global config

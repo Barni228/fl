@@ -1,7 +1,8 @@
+use crate::toml_helper;
 use serde::{Deserialize, Serialize};
-use std::env;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use std::{env, fs};
 
 // All config options can be overridden via CLI arguments
 
@@ -20,7 +21,36 @@ use std::str::FromStr;
 /// ```
 pub const DEFAULT_CONFIG: &str = include_str!("../default_config.toml");
 
-// Types
+#[derive(thiserror::Error, Debug)]
+pub enum ConfigError {
+    #[error("I/O error")]
+    IOError(#[from] std::io::Error),
+
+    #[error("Failed to parse config")]
+    InvalidConfig(#[from] conf::ConfigError),
+
+    #[error("Failed to set `{key}` to `{value}` in config file")]
+    SetError {
+        key: String, // full name of the thing to set ("a.b", "a.b" will be the String)
+        value: String,
+        source: toml_helper::TomlSetError,
+    },
+
+    #[error("Failed to get `{key}` in config file")]
+    GetError {
+        key: String,
+        source: toml_helper::TomlGetError,
+    },
+
+    #[error("Unrecognized key `{key}`, could not find a default value for it")]
+    ResetError {
+        key: String,
+        source: toml_helper::TomlGetError,
+    },
+
+    #[error("Failed to parse config with toml_edit")]
+    InvalidConfigEdit(#[from] toml_edit::TomlError),
+}
 
 #[derive(thiserror::Error, Debug)]
 pub enum BetterEnvError {
@@ -134,6 +164,101 @@ impl Config {
         } else {
             builder
         }
+    }
+}
+
+// Config file setters and getters
+impl Config {
+    pub fn set_key(
+        &mut self,
+        config_path: &Path,
+        key: &str,
+        value: &str,
+    ) -> Result<(), ConfigError> {
+        // parse value as toml value (like string or bool), and if that fails treat it as a string
+        let val = value.parse().unwrap_or_else(|_| toml_edit::value(value));
+
+        self.set_key_value(config_path, key, val)
+    }
+
+    pub fn set_key_value(
+        &mut self,
+        config_path: &Path,
+        key: &str,
+        value: toml_edit::Item,
+    ) -> Result<(), ConfigError> {
+        let config_content = fs::read_to_string(config_path)?;
+
+        let mut doc: toml_edit::DocumentMut = config_content.parse()?;
+
+        let err = toml_helper::set_key(&mut doc, key, value.clone());
+        if let Err(e) = err {
+            return Err(ConfigError::SetError {
+                key: key.to_string(),
+                value: value.to_string(),
+                source: e,
+            });
+        };
+
+        let new_content = doc.to_string();
+        // make sure that the new config is valid
+        Config::from_str(&new_content)?;
+        // update self
+        self.set_key_no_file(key, value.clone())?;
+
+        fs::write(config_path, new_content)?;
+
+        println!("Successfully updated config:");
+        println!("{key} = {value}");
+        Ok(())
+    }
+
+    pub fn reset_key(&mut self, config_path: &Path, key: &str) -> Result<(), ConfigError> {
+        let doc = DEFAULT_CONFIG.parse()?;
+        // if the key does not exist in DEFAULT_CONFIG, then return ResetError instead of regular GetError
+        let value = toml_helper::get_key(&doc, key).map_err(|e| ConfigError::ResetError {
+            key: key.to_string(),
+            source: e,
+        })?;
+
+        // this should always succeed, because key and value are both 100% valid
+        // unless config_path doesn't exist, of course
+        self.set_key_value(config_path, key, value)
+    }
+
+    pub fn get_key(&self, key: &str) -> Result<String, ConfigError> {
+        // convert self to toml string, from which I get the key, so global is automatically handled
+        let config_content = toml::to_string(self).expect("Config should alway be valid TOML");
+        let doc: toml_edit::Document<String> = config_content.parse()?;
+
+        let value = toml_helper::get_key(&doc, key).map_err(|e| ConfigError::GetError {
+            key: key.to_string(),
+            source: e,
+        })?;
+
+        Ok(value.to_string())
+    }
+
+    /// Set a key on this config, without changing any files
+    pub fn set_key_no_file(
+        &mut self,
+        key: &str,
+        value: toml_edit::Item,
+    ) -> Result<(), ConfigError> {
+        // convert self to toml string, so i only set the key that I want and nothing else
+        let config_content = toml::to_string(self).expect("Config should alway be valid TOML");
+        let value_str = value.to_string();
+
+        let mut doc: toml_edit::DocumentMut = config_content.parse()?;
+        toml_helper::set_key(&mut doc, key, value).map_err(|e| ConfigError::SetError {
+            key: key.to_string(),
+            value: value_str,
+            source: e,
+        })?;
+
+        *self = doc.to_string().parse()?;
+
+        Ok(())
     }
 }
 

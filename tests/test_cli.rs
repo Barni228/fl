@@ -506,10 +506,11 @@ fn test_cli_config_get_nonexistent_key_fails() {
     cmd(dir.path(), ["config", "get", "log.does_not_exist"])
         .failure()
         .stderr(concat!(
-            "Error: Failed to get `log.does_not_exist` in config file\n",
+            "Error: Config error\n",
             "\n",
             "Caused by:\n",
-            "    `log.does_not_exist` not found\n"
+            "    0: Failed to get `log.does_not_exist` in config file\n",
+            "    1: `log.does_not_exist` not found\n",
         ));
 }
 
@@ -590,10 +591,11 @@ fn test_cli_config_set_invalid_key_fails() {
         .stdout("Error Detected, config not updated\n")
         .stderr(
             "\
-Error: Failed to parse config
+Error: Config error
 
 Caused by:
-    unknown field `nonexistent`, expected one of `color`, `auto_update`, `rm_commit_file`, `editor`, `log`
+    0: Failed to parse config
+    1: unknown field `nonexistent`, expected one of `color`, `auto_update`, `rm_commit_file`, `editor`, `log`
 ",
         );
 }
@@ -607,10 +609,11 @@ fn test_cli_config_set_invalid_value_fails() {
         .stdout("Error Detected, config not updated\n")
         .stderr(
             "\
-Error: Failed to parse config
+Error: Config error
 
 Caused by:
-    invalid type: string \"not_a_number\", expected an integer for key `log.max`
+    0: Failed to parse config
+    1: invalid type: string \"not_a_number\", expected an integer for key `log.max`
 ",
         );
 }
@@ -650,10 +653,11 @@ fn test_cli_config_reset_nonexistent_key_fails() {
         .stdout("Error Detected, config not updated\n")
         .stderr(
             "\
-Error: Unrecognized key `log.does_not_exist`, could not find a default value for it
+Error: Config error
 
 Caused by:
-    `log.does_not_exist` not found
+    0: Unrecognized key `log.does_not_exist`, could not find a default value for it
+    1: `log.does_not_exist` not found
 ",
         );
 }

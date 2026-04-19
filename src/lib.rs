@@ -1,4 +1,4 @@
-use crate::{commit::Commit, config::Config};
+use crate::commit::Commit;
 use colored::Colorize;
 use filelist::FileList;
 use fs_err as fs;
@@ -13,7 +13,7 @@ use std::process;
 pub mod commit;
 pub mod config;
 mod rename_detection;
-mod toml_helper;
+pub(crate) mod toml_helper;
 
 /// Alias for a `Result` with the error type [`crate::Error`]
 pub type Result<T, E = Error> = std::result::Result<T, E>;
@@ -27,27 +27,8 @@ pub enum Error {
     #[error("Failed to parse config")]
     InvalidConfig(#[from] conf::ConfigError),
 
-    #[error("Failed to set `{key}` to `{value}` in config file")]
-    ConfigSetError {
-        key: String, // full name of the thing to set ("a.b", "a.b" will be the String)
-        value: String,
-        source: toml_helper::TomlSetError,
-    },
-
-    #[error("Failed to get `{key}` in config file")]
-    ConfigGerError {
-        key: String,
-        source: toml_helper::TomlGetError,
-    },
-
-    #[error("Unrecognized key `{key}`, could not find a default value for it")]
-    ConfigResetError {
-        key: String,
-        source: toml_helper::TomlGetError,
-    },
-
-    #[error("Failed to parse config with toml_edit")]
-    InvalidConfigEdit(#[from] toml_edit::TomlError),
+    #[error("Config error")]
+    ConfigError(#[from] config::ConfigError),
 
     #[error("fatal: Invalid commit index: {index} ({})", if *max == -1 { "no commits exist".to_string() } else { format!("must be between {min} and {max}", min = -max - 1) })]
     CommitNotFound { index: i32, max: i32 },
@@ -427,64 +408,17 @@ impl FL {
     }
 
     pub fn set_config_key(&mut self, key: &str, value: &str) -> Result<()> {
-        let val = value.parse().unwrap_or_else(|_| toml_edit::value(value));
-
-        self.set_config_key_value(key, val)
-    }
-
-    pub fn set_config_key_value(&mut self, key: &str, value: toml_edit::Item) -> Result<()> {
-        let config_content = fs::read_to_string(self.config_path())?;
-
-        let mut doc: toml_edit::DocumentMut = config_content.parse()?;
-
-        // parse value as toml value (like string or bool), and if that fails treat it as a string
-        let value_str = value.to_string();
-
-        let err = toml_helper::set_key(&mut doc, key, value);
-        if let Err(e) = err {
-            return Err(Error::ConfigSetError {
-                key: key.to_string(),
-                value: value_str,
-                source: e,
-            });
-        };
-
-        let new_content = doc.to_string();
-        // make sure that the new config is valid
-        self.config = Config::load_str(&new_content, true)?;
-
-        fs::write(self.config_path(), new_content)?;
-
-        println!("Successfully updated config:");
-        println!("{key} = {value_str}");
+        self.config.set_key(&self.config_path(), key, value)?;
         Ok(())
     }
 
-    pub fn reset_config_key(&mut self, key: &str) -> Result<()> {
-        let doc = config::DEFAULT_CONFIG.parse()?;
-        // if the key does not exist in DEFAULT_CONFIG, then return ResetError instead of regular GetError
-        let value = toml_helper::get_key(&doc, key).map_err(|e| Error::ConfigResetError {
-            key: key.to_string(),
-            source: e,
-        })?;
-
-        // this should always succeed, because key and value are both 100% valid
-        self.set_config_key_value(key, value)
+    pub fn get_config_key(&self, key: &str) -> Result<String> {
+        Ok(self.config.get_key(key)?)
     }
 
-    pub fn get_config_key(&self, key: &str) -> Result<String> {
-        // convert self.config to toml string, from which I get the key, so global is automatically handled
-        let config_content =
-            toml::to_string(&self.config).expect("Config should alway be valid TOML");
-
-        let doc: toml_edit::Document<String> = config_content.parse()?;
-
-        let value = toml_helper::get_key(&doc, key).map_err(|e| Error::ConfigGerError {
-            key: key.to_string(),
-            source: e,
-        })?;
-
-        Ok(value.to_string())
+    pub fn reset_config_key(&mut self, key: &str) -> Result<()> {
+        self.config.reset_key(&self.config_path(), key)?;
+        Ok(())
     }
 
     pub fn open_interactive<P: AsRef<Path>>(&self, file: P) -> Result<()> {
