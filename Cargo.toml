@@ -22,4 +22,5 @@ toml_edit = "0.25.10"
 
 [dev-dependencies]
 assert_cmd = { version = "2.2.0", features = ["color"] }
+predicates = { version = "3.1.4", default-features = false }
 tempfile = "3.27.0"

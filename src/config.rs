@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 use std::env;
-use std::io::{self, IsTerminal};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
@@ -33,7 +32,7 @@ pub enum BetterEnvError {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(default, deny_unknown_fields)]
 pub struct Config {
-    pub colors: ColorOptions,
+    pub color: ColorOptions,
     pub rm_commit_file: bool,
     pub editor: Editor,
     pub log: Log,
@@ -97,7 +96,12 @@ impl Config {
         if use_global {
             builder = Self::handle_global(builder);
         }
-        builder = builder.add_source(conf::File::from(local_path).required(false));
+        builder = builder.add_source(
+            conf::File::from(local_path)
+                // tell conf that this is toml, because if I dont it will break when file doesn't end with .toml
+                .format(conf::FileFormat::Toml)
+                .required(false),
+        );
 
         builder.build()?.try_deserialize()
     }
@@ -121,17 +125,13 @@ impl Config {
             });
 
         if let Some(path) = global_config {
-            builder.add_source(conf::File::from(path).required(false))
+            builder.add_source(
+                conf::File::from(path)
+                    .format(conf::FileFormat::Toml)
+                    .required(false),
+            )
         } else {
             builder
-        }
-    }
-
-    pub fn use_color(&self) -> bool {
-        match self.colors {
-            ColorOptions::Auto => io::stdout().is_terminal(),
-            ColorOptions::Always => true,
-            ColorOptions::Never => false,
         }
     }
 }

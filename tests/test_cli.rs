@@ -495,7 +495,7 @@ fn test_cli_config_get() {
         .success()
         .stdout("true\n");
 
-    cmd(dir.path(), ["config", "get", "colors"])
+    cmd(dir.path(), ["config", "get", "color"])
         .success()
         .stdout("\"auto\"\n");
 }
@@ -569,14 +569,14 @@ fn test_cli_config_set_str() {
     )
     .unwrap();
 
-    cmd(dir.path(), ["config", "set", "colors", "never"])
+    cmd(dir.path(), ["config", "set", "color", "never"])
         .success()
         .stdout(
             "Successfully updated config:\n\
-            colors = \"never\"\n",
+            color = \"never\"\n",
         );
     assert_eq!(
-        config::DEFAULT_CONFIG.replace(r#"colors = "auto""#, r#"colors = "never""#),
+        config::DEFAULT_CONFIG.replace(r#"color = "auto""#, r#"color = "never""#),
         fs::read_to_string(dir.path().join(".fl").join("config.toml")).unwrap()
     );
 }
@@ -593,7 +593,7 @@ fn test_cli_config_set_invalid_key_fails() {
 Error: Failed to parse config
 
 Caused by:
-    unknown field `nonexistent`, expected one of `colors`, `rm_commit_file`, `editor`, `log`
+    unknown field `nonexistent`, expected one of `color`, `rm_commit_file`, `editor`, `log`
 ",
         );
 }
@@ -685,7 +685,7 @@ fn test_cli_log_no_repo_fails() {
     cmd("/tmp", ["log"]).failure();
 }
 
-// // ─── full round-trip ──────────────────────────────────────────────────────────
+// ─── Everything ───────────────────────────────────────────────────────────────
 
 #[test]
 fn test_cli_full_workflow() {

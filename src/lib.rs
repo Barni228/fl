@@ -84,22 +84,6 @@ enum Action<'a> {
 }
 
 impl<'a> Action<'a> {
-    fn colored(&self) -> String {
-        match self {
-            Action::Add(path) => format!("{A}  {path}", A = "A".green(), path = path.display()),
-            Action::Remove(path) => format!("{D}  {path}", D = "D".red(), path = path.display()),
-            Action::Modify(path) => format!("{M}  {path}", M = "M".yellow(), path = path.display()),
-            Action::Rename(from, to) => {
-                format!(
-                    r#"{R}  "{from}" -> "{to}""#,
-                    R = "R".blue(),
-                    from = from.display(),
-                    to = to.display()
-                )
-            }
-        }
-    }
-
     fn sort_key(&self) -> (&Path, u8) {
         match self {
             Action::Add(p) => (p, 0),
@@ -113,11 +97,19 @@ impl<'a> Action<'a> {
 impl<'a> fmt::Display for Action<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Action::Add(path) => write!(f, "A  {}", path.display()),
-            Action::Remove(path) => write!(f, "D  {}", path.display()),
-            Action::Modify(path) => write!(f, "M  {}", path.display()),
+            Action::Add(path) => write!(f, "{A}  {path}", A = "A".green(), path = path.display()),
+            Action::Remove(path) => write!(f, "{D}  {path}", D = "D".red(), path = path.display()),
+            Action::Modify(path) => {
+                write!(f, "{M}  {path}", M = "M".yellow(), path = path.display())
+            }
             Action::Rename(from, to) => {
-                write!(f, r#"R  "{}" -> "{}""#, from.display(), to.display())
+                write!(
+                    f,
+                    r#"{R}  "{from}" -> "{to}""#,
+                    R = "R".blue(),
+                    from = from.display(),
+                    to = to.display()
+                )
             }
         }
     }
@@ -402,7 +394,10 @@ impl FL {
                         Commit::default()
                     };
                     let num_changes = FL::diff_actions_commit(&prev_commit, &commit).len();
-                    format!(" ({num_changes} Changes)")
+                    match num_changes {
+                        1 => " (1 Change)".to_string(),
+                        _ => format!(" ({num_changes} Changes)"),
+                    }
                 }
                 false => "".to_string(),
             };
@@ -620,11 +615,14 @@ impl FL {
             {
                 continue;
             }
-            if self.config.use_color() {
-                println!("{}", action.colored());
-            } else {
-                println!("{}", action);
+
+            match self.config.color {
+                config::ColorOptions::Auto => colored::control::unset_override(),
+                config::ColorOptions::Always => colored::control::set_override(true),
+                config::ColorOptions::Never => colored::control::set_override(false),
             }
+
+            println!("{}", action);
         }
     }
 

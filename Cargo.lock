@@ -435,6 +435,7 @@ dependencies = [
  "filelist",
  "fs-err",
  "pathfinding",
+ "predicates",
  "serde",
  "serde_json",
  "strsim",

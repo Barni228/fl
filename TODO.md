@@ -15,6 +15,7 @@
 - [ ] Add `config --global set ...` which will set things on global config file (`~/.config/fl/config.toml`)
 - [ ] Add a way to disable global config in local config (like `use_global_config = false`)
 - [ ] Add a way to set every setting with --flags
+- [ ] Make `config reset` just delete a key instead of setting it to its default value
 
 ## Bugs / Improvements
 
@@ -22,10 +23,10 @@
 - [ ] Don't panic when `.fl/` folder is invalid (does not contain `history/`, or has weird permissions)
 - [ ] Add meaningful exit codes (instead of using raw_os_error)
 - [ ] Maybe make config.rs handle all of the get/set toml stuff with its own errors
-- [ ] Add tests to test if `config` actually works (both local and global)
 
 ## Done
 
+- [x] Add tests to test if `config` actually works (both local and global)
 - [x] Add a way to not load global config
 - [x] Allow a global `~/.config/fl/config.toml` config (use `config` crate)
 - [x] Make interactive commit save file in fl repo rather than temp file, like `git` (git also doesn't remove it)
