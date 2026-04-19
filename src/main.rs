@@ -6,27 +6,28 @@ fn main() -> anyhow::Result<()> {
     let auto_update = matches.get_flag("update");
     let use_global = !matches.get_flag("no-global");
 
+    let get_fl = || -> fl::Result<FL> {
+        let mut fl = FL::in_current_dir(use_global)?;
+        // only set auto_update if its true
+        fl.config.auto_update |= auto_update;
+        Ok(fl)
+    };
+
     match matches.subcommand() {
         Some(("init", _)) => {
             FL::init()?;
         }
         Some(("update", _)) => {
-            let fl = FL::in_current_dir(use_global)?;
+            let fl = get_fl()?;
             println!("Updating {}", fl.root().display());
             fl.update()?;
         }
         Some(("status", _)) => {
-            let fl = FL::in_current_dir(use_global)?;
-            if auto_update {
-                fl.update()?;
-            }
+            let fl = get_fl()?;
             fl.status()?;
         }
         Some(("diff", sub)) => {
-            let fl = FL::in_current_dir(use_global)?;
-            if auto_update {
-                fl.update()?;
-            }
+            let fl = get_fl()?;
             let first = *sub.get_one::<i32>("FIRST").unwrap();
             match sub.get_one::<i32>("SECOND") {
                 Some(&second) => fl.diff_history(first, second)?,
@@ -34,10 +35,7 @@ fn main() -> anyhow::Result<()> {
             }
         }
         Some(("commit", sub)) => {
-            let mut fl = FL::in_current_dir(use_global)?;
-            if auto_update {
-                fl.update()?;
-            }
+            let mut fl = get_fl()?;
             let message = sub.get_one::<String>("MESSAGE");
             let empty = sub.get_flag("empty");
 
@@ -50,7 +48,7 @@ fn main() -> anyhow::Result<()> {
             }
         }
         Some(("log", _)) => {
-            FL::in_current_dir(use_global)?.print_short_log()?;
+            get_fl()?.print_short_log()?;
         }
         Some(("config", sub)) => match sub.subcommand() {
             Some(("default", _)) => {
@@ -58,19 +56,20 @@ fn main() -> anyhow::Result<()> {
                 print!("{}", fl::config::DEFAULT_CONFIG);
             }
             Some(("path", _)) => {
-                let config_path = FL::in_current_dir(use_global)?.config_path();
+                let config_path = get_fl()?.config_path();
                 println!("{}", config_path.display());
             }
             Some(("open", _)) => {
-                let fl = FL::in_current_dir(use_global)?;
+                let fl = get_fl()?;
                 fl.open_interactive(fl.config_path())?;
             }
             Some(("get", sub)) => {
+                let fl = get_fl()?;
                 let key = sub.get_one::<String>("KEY").unwrap();
-                println!("{}", FL::in_current_dir(use_global)?.get_config_key(key)?);
+                println!("{}", fl.get_config_key(key)?);
             }
             Some(("set", sub)) => {
-                let mut fl = FL::in_current_dir(use_global)?;
+                let mut fl = get_fl()?;
                 let key = sub.get_one::<String>("KEY").unwrap();
                 let value = sub.get_one::<String>("VALUE").unwrap();
 
@@ -79,15 +78,15 @@ fn main() -> anyhow::Result<()> {
                     .inspect_err(|_| println!("Error Detected, config not updated"))?;
             }
             Some(("reset", sub)) => {
+                let mut fl = get_fl()?;
                 let key = sub.get_one::<String>("KEY").unwrap();
-                let mut fl = FL::in_current_dir(use_global)?;
                 fl.reset_config_key(key)
                     .inspect_err(|_| println!("Error Detected, config not updated"))?;
             }
             _ => {}
         },
         Some(("pwd", _)) => {
-            println!("{}", FL::in_current_dir(use_global)?.root().display());
+            println!("{}", get_fl()?.root().display());
         }
         _ => {}
     }

@@ -1,5 +1,7 @@
 # When to use colored output, possible values: "auto", "always", "never"
 color = "auto"
+# if true, automatically run `fl update` before every command that needs it
+auto_update = false
 # if true, automatically remove the FL_COMMIT_MESSAGE file
 rm_commit_file = false
 

@@ -221,7 +221,7 @@ impl FL {
     }
 
     pub fn status(&self) -> Result<()> {
-        let stage = Commit::from_path(self.stage_path())?;
+        let stage = self.get_stage()?;
         let last_commit = match self.commits {
             0 => commit::Commit::default(),
             _ => self.get_commit(self.commits - 1)?,
@@ -273,7 +273,7 @@ impl FL {
     /// * `M` - Modified file
     /// * `R` - Renamed/moved file
     pub fn diff_stage(&self, commit: i32) -> Result<()> {
-        let stage = Commit::from_path(self.stage_path())?;
+        let stage = self.get_stage()?;
         // if there are no commits, if user gave -1 or 0, diff against empty commit
         let target_commit = if self.commits == 0 && [-1, 0].contains(&commit) {
             println!("Diffing EMPTY and STAGE");
@@ -290,7 +290,7 @@ impl FL {
 
     /// Commit the STAGE file, without a commit message
     pub fn commit_empty(&mut self) -> Result<()> {
-        let mut stage = Commit::from_path(self.stage_path())?;
+        let mut stage = self.get_stage()?;
         stage.set_timestamp_now();
         self.commit_commit(&stage)
     }
@@ -323,7 +323,7 @@ impl FL {
 
     /// Commit the STAGE file, with a only a title
     pub fn commit_title(&mut self, title: String) -> Result<()> {
-        let mut stage = Commit::from_path(self.stage_path())?;
+        let mut stage = self.get_stage()?;
         // only set the title, leave body None
         stage.title = Some(title);
         stage.set_timestamp_now();
@@ -332,7 +332,7 @@ impl FL {
 
     /// Commit the STAGE file, with a title and body
     pub fn commit_title_body(&mut self, title: String, body: String) -> Result<()> {
-        let mut stage = Commit::from_path(self.stage_path())?;
+        let mut stage = self.get_stage()?;
         stage.title = Some(title);
         stage.body = Some(body);
         stage.set_timestamp_now();
@@ -364,6 +364,15 @@ impl FL {
         let path = self.history_file_path(valid_commit);
         let commit = Commit::from_path(&path)?;
         Ok(commit)
+    }
+
+    /// Get the STAGE file, and handle [`Config::auto_update`]
+    pub fn get_stage(&self) -> Result<Commit> {
+        if self.config.auto_update {
+            self.update()?;
+        }
+        let stage = Commit::from_path(self.stage_path())?;
+        Ok(stage)
     }
 
     pub fn print_short_log(&self) -> Result<()> {

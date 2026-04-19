@@ -593,7 +593,7 @@ fn test_cli_config_set_invalid_key_fails() {
 Error: Failed to parse config
 
 Caused by:
-    unknown field `nonexistent`, expected one of `color`, `rm_commit_file`, `editor`, `log`
+    unknown field `nonexistent`, expected one of `color`, `auto_update`, `rm_commit_file`, `editor`, `log`
 ",
         );
 }

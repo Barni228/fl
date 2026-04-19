@@ -53,7 +53,7 @@ fn set_config(repo: &tempfile::TempDir, content: &str) {
     fs::write(repo.path().join(".fl").join("config.toml"), content).unwrap();
 }
 
-// ─── colors ───────────────────────────────────────────────────────────────────
+// ─── color ────────────────────────────────────────────────────────────────────
 
 #[test]
 fn test_config_color_never() {
@@ -109,10 +109,65 @@ fn test_config_color_respect_env_vars() {
         .stdout(predicates::str::contains('\x1b'));
 }
 
+// ─── auto_update ──────────────────────────────────────────────────────────────
+
+#[test]
+fn test_config_auto_update_false() {
+    let dir = new_repo();
+    set_config(&dir, "auto_update = false");
+
+    // auto update is false, so you have to run `fl update` to see the changes
+    cmd(dir.path(), ["status"]).success().stdout("No changes\n");
+
+    cmd(dir.path(), ["update"]).success();
+    cmd(dir.path(), ["status"]).success().stdout("A  .\n");
+}
+
+#[test]
+fn test_config_auto_update_true() {
+    let dir = new_repo();
+    set_config(&dir, "auto_update = true");
+
+    // auto update is true, so update is run automatically
+    cmd(dir.path(), ["status"]).success().stdout("A  .\n");
+}
+
+// ─── rm_commit_file ───────────────────────────────────────────────────────────
+
+#[test]
+fn test_config_rm_commit_file_false() {
+    let dir = new_repo();
+    let msg_path = dir.path().join(".fl").join("FL_COMMIT_MESSAGE");
+    // Use `true` as the editor so it exits immediately without changing the file.
+    set_config(
+        &dir,
+        "rm_commit_file = false\n\
+        editor.command = [\"true\"]",
+    );
+    cmd(dir.path(), ["commit"]).success();
+
+    assert!(msg_path.exists());
+}
+
+#[test]
+fn test_config_rm_commit_file_true() {
+    let dir = new_repo();
+    let msg_path = dir.path().join(".fl").join("FL_COMMIT_MESSAGE");
+    set_config(
+        &dir,
+        "rm_commit_file = true\n\
+        editor.command = [\"true\"]",
+    );
+
+    cmd(dir.path(), ["commit"]).success();
+
+    assert!(!msg_path.exists());
+}
+
 // ─── log.max ──────────────────────────────────────────────────────────────────
 
 #[test]
-fn test_config_log_max_zero_shows_all() {
+fn test_config_log_max_0_shows_all() {
     let dir = new_repo();
     set_config(&dir, "[log]\nmax = 0");
 
@@ -351,38 +406,6 @@ fn test_config_log_nothing() {
         "0: \n\
         1: \n",
     );
-}
-
-// ─── rm_commit_file ───────────────────────────────────────────────────────────
-
-#[test]
-fn test_config_rm_commit_file_false() {
-    let dir = new_repo();
-    let msg_path = dir.path().join(".fl").join("FL_COMMIT_MESSAGE");
-    // Use `true` as the editor so it exits immediately without changing the file.
-    set_config(
-        &dir,
-        "rm_commit_file = false\n\
-        editor.command = [\"true\"]",
-    );
-    cmd(dir.path(), ["commit"]).success();
-
-    assert!(msg_path.exists());
-}
-
-#[test]
-fn test_config_rm_commit_file_true_removes_file() {
-    let dir = new_repo();
-    let msg_path = dir.path().join(".fl").join("FL_COMMIT_MESSAGE");
-    set_config(
-        &dir,
-        "rm_commit_file = true\n\
-        editor.command = [\"true\"]",
-    );
-
-    cmd(dir.path(), ["commit"]).success();
-
-    assert!(!msg_path.exists());
 }
 
 // ─── Global config is respected ───────────────────────────────────────────────

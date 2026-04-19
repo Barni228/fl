@@ -10,7 +10,6 @@
 - [ ] Add a way to filter commits, like `-ad` for only add or delete actions
 - [ ] Add a way to ignore files/folders, like `.gitignore`
 - [ ] Make `config reset` work even if the current config file is broken
-- [ ] Add auto update by default option in config, so that `--update` flag could be enabled by default
 - [ ] Make `config set editor.command "code -w"` work (`command = ["code", "-w"]`)
 - [ ] Add `config --global set ...` which will set things on global config file (`~/.config/fl/config.toml`)
 - [ ] Add a way to disable global config in local config (like `use_global_config = false`)
@@ -23,9 +22,11 @@
 - [ ] Don't panic when `.fl/` folder is invalid (does not contain `history/`, or has weird permissions)
 - [ ] Add meaningful exit codes (instead of using raw_os_error)
 - [ ] Maybe make config.rs handle all of the get/set toml stuff with its own errors
+- [ ] Bug: `config set` will set something, and then reload config, thus ignoring `-u` and `--no-global` flags
 
 ## Done
 
+- [x] Add auto update by default option in config, so that `--update` flag could be enabled by default
 - [x] Add tests to test if `config` actually works (both local and global)
 - [x] Add a way to not load global config
 - [x] Allow a global `~/.config/fl/config.toml` config (use `config` crate)
