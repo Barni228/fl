@@ -12,7 +12,7 @@ macro_rules! snapshot {
         >(value).unwrap()
     }};
 }
-// ─── helpers ──────────────────────────────────────────────────────────────────
+// --- helpers ------------------------------------------------------------------
 
 /// Create a new [`assert_cmd::Command`] and return the [`assert_cmd::assert::Assert`]
 #[must_use]
@@ -39,7 +39,7 @@ fn new_repo() -> tempfile::TempDir {
     dir
 }
 
-// ─── init ─────────────────────────────────────────────────────────────────────
+// --- init ---------------------------------------------------------------------
 
 #[test]
 fn test_cli_init() {
@@ -59,7 +59,7 @@ fn test_cli_init_twice_fails() {
     cmd(dir.path(), ["init"]).failure();
 }
 
-// ─── update ───────────────────────────────────────────────────────────────────
+// --- update -------------------------------------------------------------------
 
 #[test]
 fn test_cli_update() {
@@ -87,7 +87,7 @@ fn test_cli_update() {
     }
 }
 
-// ─── commit ───────────────────────────────────────────────────────────────────
+// --- commit -------------------------------------------------------------------
 
 #[test]
 fn test_cli_commit() {
@@ -175,7 +175,7 @@ fn test_cli_commit_timestamp() {
     assert!(diff < time::Duration::seconds(2));
 }
 
-// ─── -u / --update auto-update flag ───────────────────────────────────────────
+// --- -u / --update auto-update flag -------------------------------------------
 #[test]
 fn test_cli_auto_update() {
     for update_flag in ["-u", "--update"] {
@@ -227,7 +227,7 @@ fn test_cli_no_update_cancels_update() {
     );
 }
 
-// ─── status ───────────────────────────────────────────────────────────────────
+// --- status -------------------------------------------------------------------
 
 #[test]
 fn test_cli_status() {
@@ -298,7 +298,7 @@ fn test_cli_status_no_commits_yet() {
     );
 }
 
-// ─── diff ─────────────────────────────────────────────────────────────────────
+// --- diff ---------------------------------------------------------------------
 
 #[test]
 fn test_cli_diff_stage_default() {
@@ -405,7 +405,7 @@ fn test_cli_diff_shows_rename() {
     );
 }
 
-// ─── log ──────────────────────────────────────────────────────────────────────
+// --- log ----------------------------------------------------------------------
 
 #[test]
 fn test_cli_log_empty() {
@@ -440,7 +440,7 @@ fn test_cli_log_no_title_for_empty_commit() {
     );
 }
 
-// ─── pwd ──────────────────────────────────────────────────────────────────────
+// --- pwd ----------------------------------------------------------------------
 
 #[test]
 fn test_cli_pwd() {
@@ -470,7 +470,7 @@ fn test_cli_pwd_no_repo_fails() {
     cmd("/tmp", ["pwd"]).failure();
 }
 
-// ─── config get ───────────────────────────────────────────────────────────────
+// --- config get ---------------------------------------------------------------
 
 #[test]
 fn test_cli_config_alias() {
@@ -514,7 +514,7 @@ fn test_cli_config_get_nonexistent_key_fails() {
         ));
 }
 
-// ─── config set ───────────────────────────────────────────────────────────────
+// --- config set ---------------------------------------------------------------
 
 #[test]
 fn test_cli_config_set() {
@@ -660,7 +660,7 @@ Caused by:
         );
 }
 
-// ─── config unset ─────────────────────────────────────────────────────────────
+// --- config unset -------------------------------------------------------------
 
 #[test]
 fn test_cli_config_unset() {
@@ -706,7 +706,7 @@ Caused by:
     }
 }
 
-// ─── no repo → failures ───────────────────────────────────────────────────────
+// --- no repo -> failures ------------------------------------------------------
 
 #[test]
 fn test_cli_update_no_repo_fails() {
@@ -733,7 +733,7 @@ fn test_cli_log_no_repo_fails() {
     cmd("/tmp", ["log"]).failure();
 }
 
-// ─── Everything ───────────────────────────────────────────────────────────────
+// --- Everything ---------------------------------------------------------------
 
 #[test]
 fn test_cli_full_workflow() {
@@ -758,7 +758,7 @@ fn test_cli_full_workflow() {
     let fl = FL::new(dir.path().to_path_buf(), false).unwrap();
     assert_eq!(3, fl.commits());
 
-    // diff commit 0 → 1 should show a modification
+    // diff commit 0 -> 1 should show a modification
     cmd(dir.path(), ["diff", "0", "1"]).success().stdout(
         "Diffing 0 and 1\n\
         M  .\n\

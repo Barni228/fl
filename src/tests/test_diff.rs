@@ -1,6 +1,6 @@
 use super::*;
 
-// ─── helpers ──────────────────────────────────────────────────────────────────
+// --- helpers ------------------------------------------------------------------
 
 fn hm<'a>(pairs: impl IntoIterator<Item = (&'a str, &'a str)>) -> HashMap<&'a Path, &'a str> {
     pairs
@@ -25,7 +25,7 @@ fn rename<'a>(from: &'a str, to: &'a str) -> Action<'a> {
     Action::Rename(Path::new(from), Path::new(to))
 }
 
-// ─── Add ──────────────────────────────────────────────────────────────────────
+// --- Add ----------------------------------------------------------------------
 
 #[test]
 fn test_diff_add_to_empty() {
@@ -53,7 +53,7 @@ fn test_diff_add_multiple() {
     );
 }
 
-// ─── Remove ───────────────────────────────────────────────────────────────────
+// --- Remove -------------------------------------------------------------------
 
 #[test]
 fn test_diff_remove_single() {
@@ -78,7 +78,7 @@ fn test_diff_remove_and_unchanged() {
     assert_eq!(vec![remove("gone")], FL::diff_map(&before, &after));
 }
 
-// ─── Modify ───────────────────────────────────────────────────────────────────
+// --- Modify -------------------------------------------------------------------
 
 #[test]
 fn test_diff_modify_single() {
@@ -104,7 +104,7 @@ fn test_diff_modify_and_unchanged() {
     assert_eq!(vec![modify("changed")], FL::diff_map(&before, &after));
 }
 
-// ─── Rename ───────────────────────────────────────────────────────────────────
+// --- Rename -------------------------------------------------------------------
 
 #[test]
 fn test_diff_rename_simple() {
@@ -138,7 +138,7 @@ fn test_diff_rename_and_move() {
 
 #[test]
 fn test_diff_rename_best_match() {
-    // alpha.txt → alpha_v2.txt is a better match (lower edit distance) than alpha.txt → gamma.txt
+    // alpha.txt -> alpha_v2.txt is a better match (lower edit distance) than alpha.txt -> gamma.txt
     let before = hm([("alpha.txt", "H"), ("beta.txt", "H")]);
     let after = hm([("alpha_v2.txt", "H"), ("gamma.txt", "H")]);
     assert_eq!(
@@ -152,7 +152,7 @@ fn test_diff_rename_best_match() {
 
 #[test]
 fn test_diff_rename_best_many() {
-    // alpha.txt → alpha_v2.txt is a better match (lower edit distance) than alpha.txt → gamma.txt
+    // alpha.txt -> alpha_v2.txt is a better match (lower edit distance) than alpha.txt -> gamma.txt
     let before = hm([
         ("one", "H"),
         ("two", "H"),
@@ -196,7 +196,7 @@ fn test_diff_rename_best_many() {
 
 #[test]
 fn test_diff_rename_and_remove() {
-    // Two deleted, one added → one rename + one true deletion
+    // Two deleted, one added -> one rename + one true deletion
     let before = hm([("a.txt", "H"), ("b.txt", "H")]);
     let after = hm([("c.txt", "H")]);
     let actions = FL::diff_map(&before, &after);
@@ -207,7 +207,7 @@ fn test_diff_rename_and_remove() {
 
 #[test]
 fn test_diff_rename_and_add() {
-    // One deleted, two added with same hash → one rename + one true addition
+    // One deleted, two added with same hash -> one rename + one true addition
     let before = hm([("a.txt", "H")]);
     let after = hm([("b.txt", "H"), ("c.txt", "H")]);
     let actions = FL::diff_map(&before, &after);
@@ -218,7 +218,7 @@ fn test_diff_rename_and_add() {
 
 #[test]
 fn test_diff_rename_while_modifying() {
-    // Different hashes → must be Remove + Add, never Rename
+    // Different hashes -> must be Remove + Add, never Rename
     let before = hm([("a.txt", "HASH_A")]);
     let after = hm([("b.txt", "HASH_B")]);
     assert_eq!(
@@ -229,7 +229,6 @@ fn test_diff_rename_while_modifying() {
 
 #[test]
 fn test_diff_rename_different_files() {
-    // Two renames with distinct hashes — groups must not cross-contaminate
     let before = hm([("a.txt", "HASH_A"), ("b.txt", "HASH_B")]);
     let after = hm([("c.txt", "HASH_A"), ("d.txt", "HASH_B")]);
     assert_eq!(
@@ -251,7 +250,7 @@ fn test_diff_rename_different_dir() {
     );
 }
 
-// ─── Mixed actions ────────────────────────────────────────────────────────────
+// --- Mixed actions ------------------------------------------------------------
 
 #[test]
 fn test_diff_all() {
@@ -262,11 +261,11 @@ fn test_diff_all() {
         ("change.txt", "old"),
     ]);
     let after = hm([
-        ("keep.txt", "K"),     // unchanged → no action
+        ("keep.txt", "K"),     // unchanged -> no action
         ("new.txt", "N"),      // added
         ("new-name.txt", "R"), // renamed from `renamed.txt` to `new-name.txt`
         ("change.txt", "new"), // modified
-                               // gone.txt absent → removed
+                               // gone.txt absent -> removed
     ]);
     assert_eq!(
         vec![
@@ -281,13 +280,13 @@ fn test_diff_all() {
 
 #[test]
 fn test_diff_modify() {
-    // Same path, different hash → Modify, not Rename
+    // Same path, different hash -> Modify, not Rename
     let before = hm([("file.txt", "old_hash")]);
     let after = hm([("file.txt", "new_hash")]);
     assert_eq!(vec![modify("file.txt")], FL::diff_map(&before, &after));
 }
 
-// ─── empty ───────────────────────────────────────────────────────────────────
+// --- empty -------------------------------------------------------------------
 
 #[test]
 fn test_diff_both_empty() {
@@ -303,7 +302,7 @@ fn test_diff_identical() {
     assert!(FL::diff_map(&before, &after).is_empty());
 }
 
-// ─── Output ordering ─────────────────────────────────────────────────────────
+// --- Output ordering ---------------------------------------------------------
 
 #[test]
 fn test_diff_output_is_sorted() {

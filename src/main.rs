@@ -157,7 +157,9 @@ fn get_clap_cmd() -> Command {
                             "Reset a key to its default value, \
                             this is different from `set` without value,\
                             `set` will set something to default, like `log.max = 0`,\
-                            `unset` will remove the key from config.toml, as if you never touched it",
+                            `unset` will remove the key from config.toml, as if you never touched it\
+                            so if `log.max = 5` in local, and `log.max = 7` in global,\
+                            `unset` will remove `log.max` from local, so it becomes `7` from global",
                         )
                         .alias("reset")
                         .arg(arg!(<KEY> "Key to reset to default")),

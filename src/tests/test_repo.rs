@@ -3,7 +3,7 @@ use serde_json::json;
 use std::fs;
 use std::path::PathBuf;
 
-// ─── Repo: automatically find the current repo ────────────────────────────────
+// --- Repo: automatically find the current repo --------------------------------
 
 #[test]
 fn test_repo_find() {
@@ -77,7 +77,7 @@ fn test_repo_structure() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-// ─── Errors ───────────────────────────────────────────────────────────────────
+// --- Errors -------------------------------------------------------------------
 #[test]
 fn test_commit_no_exist() {
     let err = commit::Commit::from_path("no_exist").unwrap_err();

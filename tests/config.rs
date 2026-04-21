@@ -4,7 +4,7 @@ use fl::{FL, config};
 use predicates::prelude::*;
 use std::{fs, path::Path};
 
-// ─── helpers ──────────────────────────────────────────────────────────────────
+// --- helpers ------------------------------------------------------------------
 
 /// Run `fl` in `dir` with `--no-global-config`
 #[must_use]
@@ -134,7 +134,7 @@ fn test_config_unset_removes_empty_table() {
     );
 }
 
-// ─── color ────────────────────────────────────────────────────────────────────
+// --- color --------------------------------------------------------------------
 
 #[test]
 fn test_config_color_never() {
@@ -190,7 +190,7 @@ fn test_config_color_respect_env_vars() {
         .stdout(predicates::str::contains('\x1b'));
 }
 
-// ─── auto_update ──────────────────────────────────────────────────────────────
+// --- auto_update --------------------------------------------------------------
 
 #[test]
 fn test_config_auto_update_false() {
@@ -213,7 +213,7 @@ fn test_config_auto_update_true() {
     cmd(dir.path(), ["status"]).success().stdout("A  .\n");
 }
 
-// ─── rm_commit_file ───────────────────────────────────────────────────────────
+// --- rm_commit_file -----------------------------------------------------------
 
 #[test]
 fn test_config_rm_commit_file_false() {
@@ -245,7 +245,7 @@ fn test_config_rm_commit_file_true() {
     assert!(!msg_path.exists());
 }
 
-// ─── log.max ──────────────────────────────────────────────────────────────────
+// --- log.max ------------------------------------------------------------------
 
 #[test]
 fn test_config_log_max_0_shows_all() {
@@ -304,7 +304,7 @@ fn test_config_log_max_too_big() {
         .stdout("0: only (just now)\n");
 }
 
-// ─── log.print_title ──────────────────────────────────────────────────────────
+// --- log.print_title ----------------------------------------------------------
 
 #[test]
 fn test_config_log_print_title_true() {
@@ -328,7 +328,7 @@ fn test_config_log_print_title_false() {
         .stdout("0:  (just now)\n");
 }
 
-// ─── log.print_title_quotes ───────────────────────────────────────────────────
+// --- log.print_title_quotes ---------------------------------------------------
 
 #[test]
 fn test_config_log_print_title_quotes_false() {
@@ -352,7 +352,7 @@ fn test_config_log_print_title_quotes_true() {
         .stdout("0: \"quoted title\" (just now)\n");
 }
 
-// ─── log.print_number_of_changes ─────────────────────────────────────────────
+// --- log.print_number_of_changes ---------------------------------------------
 
 #[test]
 fn test_config_log_print_number_of_changes_false() {
@@ -384,7 +384,7 @@ fn test_config_log_print_number_of_changes_zero() {
     let dir = new_repo();
     set_config(&dir, "log.print_number_of_changes = true");
 
-    // Empty commit → 0 changes relative to previous (also empty).
+    // Empty commit -> 0 changes relative to previous (also empty).
     cmd(dir.path(), ["commit", "title"]).success();
 
     cmd(dir.path(), ["log"])
@@ -392,7 +392,7 @@ fn test_config_log_print_number_of_changes_zero() {
         .stdout("0: title (0 Changes) (just now)\n");
 }
 
-// ─── log.print_time_ago ───────────────────────────────────────────────────────
+// --- log.print_time_ago -------------------------------------------------------
 
 #[test]
 fn test_config_log_print_time_ago_true() {
@@ -415,7 +415,7 @@ fn test_config_log_print_time_ago_false() {
     cmd(dir.path(), ["log"]).success().stdout("0: title\n");
 }
 
-// ─── log.print_date ───────────────────────────────────────────────────────────
+// --- log.print_date -----------------------------------------------------------
 
 #[test]
 fn test_config_log_print_date_false() {
@@ -489,7 +489,7 @@ fn test_config_log_nothing() {
     );
 }
 
-// ─── Global config is respected ───────────────────────────────────────────────
+// --- Global config is respected -----------------------------------------------
 
 #[test]
 fn test_global_config() {
@@ -565,7 +565,7 @@ fn test_config_global_does_not_exist() {
 
     cmd(dir.path(), ["commit", "title"]).success();
 
-    // Point FL_GLOBAL_CONFIG at a path that does not exist — should not fail.
+    // Point FL_GLOBAL_CONFIG at a path that does not exist, should not fail.
     cmd_global(dir.path(), ["log"], &no_exist)
         .success()
         .stdout("0: title (just now)\n");

@@ -215,7 +215,7 @@ mod tests {
         );
     }
 
-    // ─── remove_key ───────────────────────────────────────────────────────────
+    // --- remove_key -----------------------------------------------------------
 
     #[test]
     fn test_remove_top_level() {
@@ -262,7 +262,7 @@ mod tests {
         assert_eq!(expected, result);
     }
 
-    // ─── set_key error paths ──────────────────────────────────────────────────
+    // --- set_key error paths --------------------------------------------------
 
     #[test]
     fn test_set_key_not_table() {
@@ -283,7 +283,7 @@ mod tests {
         );
     }
 
-    // ─── get_key error paths ──────────────────────────────────────────────────
+    // --- get_key error paths --------------------------------------------------
 
     #[test]
     fn test_get_key_not_found() {
@@ -314,7 +314,7 @@ mod tests {
         );
     }
 
-    // ─── remove_key error paths ───────────────────────────────────────────────
+    // --- remove_key error paths -----------------------------------------------
 
     #[test]
     fn test_remove_key_not_found() {

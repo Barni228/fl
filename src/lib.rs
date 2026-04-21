@@ -52,10 +52,10 @@ pub enum Error {
 /// Represents a change detected between two file snapshots.
 ///
 /// Each variant describes a type of file change:
-/// * `Add` — the file was added
-/// * `Remove` — the file was deleted
-/// * `Modify` — the file content changed
-/// * `Rename` — the file was moved or renamed
+/// * `Add` - the file was added
+/// * `Remove` - the file was deleted
+/// * `Modify` - the file content changed
+/// * `Rename` - the file was moved or renamed
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Action<'a> {
     Add(&'a Path),
@@ -587,8 +587,8 @@ impl FL {
     /// Computes the differences between two snapshots of files and returns a list of actions.
     ///
     /// # Arguments
-    /// * `old` — previous snapshot, maps paths (keys) to hashes (values)
-    /// * `new` — current snapshot, maps paths (keys) to hashes (values)
+    /// * `old` - previous snapshot, maps paths (keys) to hashes (values)
+    /// * `new` - current snapshot, maps paths (keys) to hashes (values)
     ///
     /// # Returns
     /// A sorted list of [`Action`] describing the differences.
@@ -614,7 +614,7 @@ impl FL {
 
         for (path, new_hash) in new {
             if old.contains_key(path) {
-                // Path existed before and is still present — already handled above.
+                // Path existed before and is still present - already handled above.
                 continue;
             }
             // if file was "deleted" but then "added" with a different name, it is a rename
