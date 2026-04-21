@@ -416,8 +416,13 @@ impl FL {
         Ok(self.config.get_key(key)?)
     }
 
-    pub fn reset_config_key(&mut self, key: &str) -> Result<()> {
-        self.config.reset_key(&self.config_path(), key)?;
+    pub fn set_config_key_default(&mut self, key: &str) -> Result<()> {
+        self.config.set_key_default(&self.config_path(), key)?;
+        Ok(())
+    }
+
+    pub fn unset_config_key(&mut self, key: &str) -> Result<()> {
+        self.config.unset_key(&self.config_path(), key)?;
         Ok(())
     }
 

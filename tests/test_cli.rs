@@ -618,10 +618,8 @@ Caused by:
         );
 }
 
-// ─── config reset ─────────────────────────────────────────────────────────────
-
 #[test]
-fn test_cli_config_reset() {
+fn test_cli_config_set_default() {
     let dir = new_repo();
 
     fs::write(
@@ -632,7 +630,7 @@ fn test_cli_config_reset() {
 
     // change, then reset
     cmd(dir.path(), ["config", "set", "log.max", "99"]).success();
-    cmd(dir.path(), ["config", "reset", "log.max"])
+    cmd(dir.path(), ["config", "set", "log.max"])
         .success()
         .stdout(
             "Successfully updated config:\n\
@@ -646,9 +644,9 @@ fn test_cli_config_reset() {
 }
 
 #[test]
-fn test_cli_config_reset_nonexistent_key_fails() {
+fn test_cli_config_set_default_no_exist_key() {
     let dir = new_repo();
-    cmd(dir.path(), ["config", "reset", "log.does_not_exist"])
+    cmd(dir.path(), ["config", "set", "log.no_exist"])
         .failure()
         .stdout("Error Detected, config not updated\n")
         .stderr(
@@ -656,10 +654,56 @@ fn test_cli_config_reset_nonexistent_key_fails() {
 Error: Config error
 
 Caused by:
-    0: Unrecognized key `log.does_not_exist`, could not find a default value for it
-    1: `log.does_not_exist` not found
+    0: Unrecognized key `log.no_exist`, could not find a default value for it
+    1: `log.no_exist` not found
 ",
         );
+}
+
+// ─── config unset ─────────────────────────────────────────────────────────────
+
+#[test]
+fn test_cli_config_unset() {
+    let dir = new_repo();
+
+    fs::write(
+        dir.path().join(".fl").join("config.toml"),
+        config::DEFAULT_CONFIG,
+    )
+    .unwrap();
+
+    // change, then reset
+    cmd(dir.path(), ["config", "set", "log.max", "99"]).success();
+    cmd(dir.path(), ["config", "unset", "log.max"])
+        .success()
+        .stdout("Successfully unset `log.max` (Now its `0`, from default)\n");
+
+    assert_eq!(
+        config::DEFAULT_CONFIG.replace(
+            "# Maximum number of most recent commits to print, set to 0 to print all\nmax = 0\n",
+            ""
+        ),
+        fs::read_to_string(dir.path().join(".fl").join("config.toml")).unwrap()
+    );
+}
+
+#[test]
+fn test_cli_config_unset_no_exist_key() {
+    for unset_cmd in ["unset", "reset"] {
+        let dir = new_repo();
+        cmd(dir.path(), ["config", unset_cmd, "log.no_exist"])
+            .failure()
+            .stdout("Error Detected, config not updated\n")
+            .stderr(
+                "\
+Error: Config error
+
+Caused by:
+    0: Unrecognized key `log.no_exist`, could not find a default value for it
+    1: `log.no_exist` not found
+",
+            );
+    }
 }
 
 // ─── no repo → failures ───────────────────────────────────────────────────────

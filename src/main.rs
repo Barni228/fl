@@ -3,13 +3,12 @@ use fl::FL;
 
 fn main() -> anyhow::Result<()> {
     let matches = get_clap_cmd().get_matches();
-    let auto_update = matches.get_flag("update");
     let use_global = !matches.get_flag("no-global");
 
     let get_fl = || -> fl::Result<FL> {
         let mut fl = FL::in_current_dir(use_global)?;
         // only set auto_update if its true
-        fl.config.auto_update |= auto_update;
+        fl.config.auto_update |= matches.get_flag("update");
         Ok(fl)
     };
 
@@ -71,16 +70,19 @@ fn main() -> anyhow::Result<()> {
             Some(("set", sub)) => {
                 let mut fl = get_fl()?;
                 let key = sub.get_one::<String>("KEY").unwrap();
-                let value = sub.get_one::<String>("VALUE").unwrap();
-
-                // tell the user that config is not updated if there is an error
-                fl.set_config_key(key, value)
-                    .inspect_err(|_| println!("Error Detected, config not updated"))?;
+                if let Some(value) = sub.get_one::<String>("VALUE") {
+                    // tell the user that config is not updated if there is an error
+                    fl.set_config_key(key, value)
+                        .inspect_err(|_| println!("Error Detected, config not updated"))?;
+                } else {
+                    fl.set_config_key_default(key)
+                        .inspect_err(|_| println!("Error Detected, config not updated"))?;
+                }
             }
-            Some(("reset", sub)) => {
+            Some(("unset", sub)) => {
                 let mut fl = get_fl()?;
                 let key = sub.get_one::<String>("KEY").unwrap();
-                fl.reset_config_key(key)
+                fl.unset_config_key(key)
                     .inspect_err(|_| println!("Error Detected, config not updated"))?;
             }
             _ => {}
@@ -149,9 +151,15 @@ fn get_clap_cmd() -> Command {
                     Command::new("set")
                         .about("Set a key in fl config file")
                         .arg(arg!(<KEY> "Key to modify"))
-                        .arg(arg!(<VALUE> "The new value")),
-                    Command::new("reset")
-                        .about("Reset a key to its default value")
+                        .arg(arg!([VALUE] "The new value, leave empty to set to default")),
+                    Command::new("unset")
+                        .about(
+                            "Reset a key to its default value, \
+                            this is different from `set` without value,\
+                            `set` will set something to default, like `log.max = 0`,\
+                            `unset` will remove the key from config.toml, as if you never touched it",
+                        )
+                        .alias("reset")
                         .arg(arg!(<KEY> "Key to reset to default")),
                 ]),
             Command::new("pwd")

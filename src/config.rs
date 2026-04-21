@@ -33,19 +33,19 @@ pub enum ConfigError {
     SetError {
         key: String, // full name of the thing to set ("a.b", "a.b" will be the String)
         value: String,
-        source: toml_helper::TomlSetError,
+        source: toml_helper::TomlKeyError,
     },
 
     #[error("Failed to get `{key}` in config file")]
     GetError {
         key: String,
-        source: toml_helper::TomlGetError,
+        source: toml_helper::TomlKeyError,
     },
 
     #[error("Unrecognized key `{key}`, could not find a default value for it")]
-    ResetError {
+    SetDefaultError {
         key: String,
-        source: toml_helper::TomlGetError,
+        source: toml_helper::TomlKeyError,
     },
 
     #[error("Failed to parse config with toml_edit")]
@@ -67,6 +67,9 @@ pub struct Config {
     pub rm_commit_file: bool,
     pub editor: Editor,
     pub log: Log,
+
+    #[serde(skip)]
+    use_global: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -122,48 +125,49 @@ impl FromStr for Config {
 
 impl Config {
     pub fn load(local_path: &Path, use_global: bool) -> Result<Self, conf::ConfigError> {
-        let mut builder = conf::Config::builder();
-        // load the global config first, only then load the local
-        if use_global {
-            builder = Self::handle_global(builder);
-        }
-        builder = builder.add_source(
+        Config::from_conf_source(
             conf::File::from(local_path)
-                // tell conf that this is toml, because if I dont it will break when file doesn't end with .toml
                 .format(conf::FileFormat::Toml)
                 .required(false),
-        );
-
-        builder.build()?.try_deserialize()
+            use_global,
+        )
     }
 
     pub fn load_str(config: &str, use_global: bool) -> Result<Self, conf::ConfigError> {
-        let mut builder = conf::Config::builder();
-        if use_global {
-            builder = Self::handle_global(builder);
-        }
-        builder = builder.add_source(conf::File::from_str(config, conf::FileFormat::Toml));
-        builder.build()?.try_deserialize()
+        Config::from_conf_source(
+            conf::File::from_str(config, conf::FileFormat::Toml),
+            use_global,
+        )
     }
 
-    fn handle_global(
-        builder: conf::ConfigBuilder<conf::builder::DefaultState>,
-    ) -> conf::ConfigBuilder<conf::builder::DefaultState> {
-        let global_config = env::var_os("FL_GLOBAL_CONFIG")
-            .map(|path| PathBuf::from(&path))
-            .or_else(|| {
-                env::home_dir().map(|home| home.join(".config").join("fl").join("config.toml"))
-            });
-
-        if let Some(path) = global_config {
-            builder.add_source(
+    fn from_conf_source<T>(source: T, use_global: bool) -> Result<Config, conf::ConfigError>
+    where
+        T: conf::Source + Send + Sync + 'static,
+    {
+        let mut builder = conf::Config::builder();
+        if use_global && let Some(path) = Config::get_global_path() {
+            builder = builder.add_source(
                 conf::File::from(path)
                     .format(conf::FileFormat::Toml)
                     .required(false),
-            )
-        } else {
-            builder
+            );
         }
+        builder = builder.add_source(source);
+
+        let mut c: Config = builder.build()?.try_deserialize()?;
+        c.use_global = use_global;
+        Ok(c)
+    }
+
+    /// Get the path to the global config file, if it could be found
+    /// This can return PathBuf even if the path does not exist
+    /// Returns None if env var `FL_GLOBAL_CONFIG` is not set and [`env::home_dir`]` fails
+    pub fn get_global_path() -> Option<PathBuf> {
+        env::var_os("FL_GLOBAL_CONFIG")
+            .map(|path| PathBuf::from(&path))
+            .or_else(|| {
+                env::home_dir().map(|home| home.join(".config").join("fl").join("config.toml"))
+            })
     }
 }
 
@@ -213,10 +217,10 @@ impl Config {
         Ok(())
     }
 
-    pub fn reset_key(&mut self, config_path: &Path, key: &str) -> Result<(), ConfigError> {
+    pub fn set_key_default(&mut self, config_path: &Path, key: &str) -> Result<(), ConfigError> {
         let doc = DEFAULT_CONFIG.parse()?;
         // if the key does not exist in DEFAULT_CONFIG, then return ResetError instead of regular GetError
-        let value = toml_helper::get_key(&doc, key).map_err(|e| ConfigError::ResetError {
+        let value = toml_helper::get_key(&doc, key).map_err(|e| ConfigError::SetDefaultError {
             key: key.to_string(),
             source: e,
         })?;
@@ -229,7 +233,7 @@ impl Config {
     pub fn get_key(&self, key: &str) -> Result<String, ConfigError> {
         // convert self to toml string, from which I get the key, so global is automatically handled
         let config_content = toml::to_string(self).expect("Config should alway be valid TOML");
-        let doc: toml_edit::Document<String> = config_content.parse()?;
+        let doc: toml_edit::Document<_> = config_content.parse()?;
 
         let value = toml_helper::get_key(&doc, key).map_err(|e| ConfigError::GetError {
             key: key.to_string(),
@@ -257,6 +261,42 @@ impl Config {
         })?;
 
         *self = doc.to_string().parse()?;
+
+        Ok(())
+    }
+
+    pub fn unset_key(&mut self, config_path: &Path, key: &str) -> Result<(), ConfigError> {
+        let config_content = fs::read_to_string(config_path)?;
+        let mut doc: toml_edit::DocumentMut = config_content.parse()?;
+
+        let from_where: &str;
+        // get default value, this will also make sure the key is valid
+        let value = if self.use_global
+            && let Some(path) = Config::get_global_path()
+            && let Ok(global_content) = fs::read_to_string(&path)
+            && let Ok(value) = toml_helper::get_key(&global_content.parse()?, key)
+        {
+            from_where = "global";
+            value
+        } else {
+            from_where = "default";
+            toml_helper::get_key(&DEFAULT_CONFIG.parse()?, key).map_err(|e| {
+                ConfigError::SetDefaultError {
+                    key: key.to_string(),
+                    source: e,
+                }
+            })?
+        };
+
+        // update self (in-memory)
+        self.set_key_no_file(key, value.clone())?;
+
+        // remove from file, I dont care if it exists in the file, because I know its a valid key at this point
+        let _ = toml_helper::remove_key(&mut doc, key);
+
+        fs::write(config_path, doc.to_string())?;
+
+        println!("Successfully unset `{key}` (Now its `{value}`, from {from_where})");
 
         Ok(())
     }

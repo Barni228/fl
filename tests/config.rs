@@ -76,6 +76,64 @@ fn test_config_get() {
     assert_eq!(fl.config.log.max, 10);
 }
 
+#[allow(clippy::bool_assert_comparison)]
+#[test]
+fn test_config_unset() {
+    let dir = new_repo();
+    let mut fl = FL::new(dir.path().to_path_buf(), false).unwrap();
+    fl.config.log.max = 10;
+
+    // make sure unset will not reset anything else
+    assert_eq!(fl.config.auto_update, false);
+    fl.config.auto_update = true;
+
+    fl.unset_config_key("log.max").unwrap();
+    assert_eq!(fl.config.log.max, 0);
+    assert_eq!(fl.get_config_key("log.max").unwrap(), "0");
+    assert_eq!(fl.config.auto_update, true);
+}
+
+#[test]
+fn test_config_unset_removes_key() {
+    let dir = new_repo();
+    set_config(&dir, "log.max = 10");
+    let mut fl = FL::new(dir.path().to_path_buf(), false).unwrap();
+    fl.config.auto_update = true;
+    fl.unset_config_key("log.max").unwrap();
+    assert_eq!(fl.config.log.max, 0);
+    assert!(fl.config.auto_update);
+    assert_eq!(
+        std::fs::read_to_string(dir.path().join(".fl").join("config.toml")).unwrap(),
+        ""
+    );
+}
+
+#[test]
+fn test_config_unset_removes_empty_table() {
+    let dir = new_repo();
+    set_config(
+        &dir,
+        "[log]
+        max = 10
+        print_date = true",
+    );
+    let mut fl = FL::new(dir.path().to_path_buf(), false).unwrap();
+    fl.unset_config_key("log.print_date").unwrap();
+    // when print_date is removed, `log.max` still exists so `log` is untouched
+    assert_eq!(
+        std::fs::read_to_string(dir.path().join(".fl").join("config.toml")).unwrap(),
+        "[log]
+        max = 10\n",
+    );
+
+    // now that `log.max` is removed, `log` is empty table, so it is also removed
+    fl.unset_config_key("log.max").unwrap();
+    assert_eq!(
+        std::fs::read_to_string(dir.path().join(".fl").join("config.toml")).unwrap(),
+        "",
+    );
+}
+
 // ─── color ────────────────────────────────────────────────────────────────────
 
 #[test]
@@ -498,7 +556,7 @@ fn test_no_global_config_flag_ignores_global() {
 }
 
 #[test]
-fn test_global_config_missing_file_is_silently_ignored() {
+fn test_config_global_does_not_exist() {
     let dir = new_repo();
 
     // tempfile object gets dropped here, so the file goes away
@@ -511,4 +569,34 @@ fn test_global_config_missing_file_is_silently_ignored() {
     cmd_global(dir.path(), ["log"], &no_exist)
         .success()
         .stdout("0: title (just now)\n");
+}
+
+#[test]
+fn test_config_unset_respect_global() {
+    let dir = new_repo();
+    set_config(&dir, "auto_update = true\nlog.max = 10");
+
+    let global = tempfile::NamedTempFile::new().unwrap();
+    fs::write(global.path(), "log.max = 1\n").unwrap();
+
+    // when I unset it, it should become whatever global says it is, not default
+    cmd_global(dir.path(), ["config", "unset", "log.max"], global.path())
+        .success()
+        .stdout("Successfully unset `log.max` (Now its `1`, from global)\n");
+
+    // since global says nothing about auto_update, it should go back to default
+    cmd_global(
+        dir.path(),
+        ["config", "unset", "auto_update"],
+        global.path(),
+    )
+    .success()
+    .stdout("Successfully unset `auto_update` (Now its `false`, from default)\n");
+
+    cmd_global(dir.path(), ["config", "get", "log.max"], global.path())
+        .success()
+        .stdout("1\n");
+    cmd_global(dir.path(), ["config", "get", "auto_update"], global.path())
+        .success()
+        .stdout("false\n");
 }

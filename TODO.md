@@ -14,16 +14,22 @@
 - [ ] Add `config --global set ...` which will set things on global config file (`~/.config/fl/config.toml`)
 - [ ] Add a way to disable global config in local config (like `use_global_config = false`)
 - [ ] Add a way to set every setting with --flags
-- [ ] Make `config reset` just delete a key instead of setting it to its default value
+- [ ] Make `fl --log-max=10 config set` set `log.max = 10` (or `--max=10`)
+- [ ] Make `fl config default log.max` print the default value for `log.max` (`0`)
 
 ## Bugs / Improvements
 
 - [ ] maybe store history paths in hex numbers instead of regular numbers (`{:08x}`)
 - [ ] Don't panic when `.fl/` folder is invalid (does not contain `history/`, or has weird permissions)
 - [ ] Add meaningful exit codes (instead of using raw_os_error)
+- [ ] Do you REALLY need `toml` crate? u use it just to get things from both local and global config nicely
+- [ ] When counting how many changes a commit made, dont do nice rename detection (should make things faster)
+- [ ] Improve how I edit toml (maybe create a new project that expands on `toml_edit`)
+- [ ] Now that Config has a private `use_global`, use that in the getters and setters
 
 ## Done
 
+- [x] Make `config reset` just delete a key instead of setting it to its default value
 - [x] Bug: `config set` will set something, and then reload config, thus ignoring `-u` and `--no-global` flags
 - [x] Maybe make config.rs handle all of the get/set toml stuff with its own errors
 - [x] Add auto update by default option in config, so that `--update` flag could be enabled by default
