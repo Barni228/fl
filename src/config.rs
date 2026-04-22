@@ -43,7 +43,7 @@ pub enum ConfigError {
     },
 
     #[error("Unrecognized key `{key}`, could not find a default value for it")]
-    SetDefaultError {
+    GetDefaultError {
         key: String,
         source: toml_helper::TomlKeyError,
     },
@@ -218,12 +218,7 @@ impl Config {
     }
 
     pub fn set_key_default(&mut self, config_path: &Path, key: &str) -> Result<(), ConfigError> {
-        let doc = DEFAULT_CONFIG.parse()?;
-        // if the key does not exist in DEFAULT_CONFIG, then return ResetError instead of regular GetError
-        let value = toml_helper::get_key(&doc, key).map_err(|e| ConfigError::SetDefaultError {
-            key: key.to_string(),
-            source: e,
-        })?;
+        let value = get_key_default_value(key)?;
 
         // this should always succeed, because key and value are both 100% valid
         // unless config_path doesn't exist, of course
@@ -280,12 +275,7 @@ impl Config {
             value
         } else {
             from_where = "default";
-            toml_helper::get_key(&DEFAULT_CONFIG.parse()?, key).map_err(|e| {
-                ConfigError::SetDefaultError {
-                    key: key.to_string(),
-                    source: e,
-                }
-            })?
+            get_key_default_value(key)?
         };
 
         // update self (in-memory)
@@ -300,6 +290,19 @@ impl Config {
 
         Ok(())
     }
+}
+
+pub fn get_key_default(key: &str) -> Result<String, ConfigError> {
+    let value = get_key_default_value(key)?;
+    Ok(value.to_string())
+}
+
+fn get_key_default_value(key: &str) -> Result<toml_edit::Item, ConfigError> {
+    let doc = DEFAULT_CONFIG.parse()?;
+    toml_helper::get_key(&doc, key).map_err(|e| ConfigError::GetDefaultError {
+        key: key.to_string(),
+        source: e,
+    })
 }
 
 // Helpers

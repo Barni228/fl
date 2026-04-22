@@ -50,9 +50,13 @@ fn main() -> anyhow::Result<()> {
             get_fl()?.print_short_log()?;
         }
         Some(("config", sub)) => match sub.subcommand() {
-            Some(("default", _)) => {
-                // don't print a new line at the end, so that the file is printed as is
-                print!("{}", fl::config::DEFAULT_CONFIG);
+            Some(("default", sub)) => {
+                if let Some(key) = sub.get_one::<String>("KEY") {
+                    println!("{}", fl::config::get_key_default(key)?);
+                } else {
+                    // don't print a new line at the end, so that the file is printed as is
+                    print!("{}", fl::config::DEFAULT_CONFIG);
+                }
             }
             Some(("path", _)) => {
                 let config_path = get_fl()?.config_path();
@@ -142,7 +146,9 @@ fn get_clap_cmd() -> Command {
                 .about("Edit fl config file")
                 .aliases(["conf", "cfg"])
                 .subcommands([
-                    Command::new("default").about("Print default fl config file"),
+                    Command::new("default")
+                        .about("Print default fl config file")
+                        .arg(arg!([KEY] "Key for which to print default value")),
                     Command::new("path").about("Print path to fl config file"),
                     Command::new("open").about("Open fl config file in editor"),
                     Command::new("get")
@@ -155,11 +161,11 @@ fn get_clap_cmd() -> Command {
                     Command::new("unset")
                         .about(
                             "Reset a key to its default value, \
-                            this is different from `set` without value,\
-                            `set` will set something to default, like `log.max = 0`,\
-                            `unset` will remove the key from config.toml, as if you never touched it\
-                            so if `log.max = 5` in local, and `log.max = 7` in global,\
-                            `unset` will remove `log.max` from local, so it becomes `7` from global",
+                        this is different from `set` without value,\
+                        `set` will set something to default, like `log.max = 0`,\
+                        `unset` will remove the key from config.toml, as if you never touched it\
+                        so if `log.max = 5` in local, and `log.max = 7` in global,\
+                        `unset` will remove `log.max` from local, so it becomes `7` from global",
                         )
                         .alias("reset")
                         .arg(arg!(<KEY> "Key to reset to default")),

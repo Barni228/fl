@@ -15,7 +15,6 @@
 - [ ] Add a way to disable global config in local config (like `use_global_config = false`)
 - [ ] Add a way to set every setting with --flags
 - [ ] Make `fl --log-max=10 config set` set `log.max = 10` (or `--max=10`)
-- [ ] Make `fl config default log.max` print the default value for `log.max` (`0`)
 
 ## Bugs / Improvements
 
@@ -29,6 +28,7 @@
 
 ## Done
 
+- [x] Make `fl config default log.max` print the default value for `log.max` (`0`)
 - [x] Make `config reset` just delete a key instead of setting it to its default value
 - [x] Bug: `config set` will set something, and then reload config, thus ignoring `-u` and `--no-global` flags
 - [x] Maybe make config.rs handle all of the get/set toml stuff with its own errors

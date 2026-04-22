@@ -34,7 +34,7 @@ where
 
 #[must_use]
 fn new_repo() -> tempfile::TempDir {
-    let dir = tempfile::TempDir::new().unwrap();
+    let dir = tempfile::tempdir().unwrap();
     FL::create_fl_repo(dir.path().to_path_buf()).unwrap();
     dir
 }
@@ -44,7 +44,7 @@ fn new_repo() -> tempfile::TempDir {
 #[test]
 fn test_cli_init() {
     for init_cmd in ["init", "i"] {
-        let dir = tempfile::TempDir::new().unwrap();
+        let dir = tempfile::tempdir().unwrap();
         cmd(dir.path(), [init_cmd]).success();
 
         // there should be a valid fl repo at that path
@@ -54,7 +54,7 @@ fn test_cli_init() {
 
 #[test]
 fn test_cli_init_twice_fails() {
-    let dir = tempfile::TempDir::new().unwrap();
+    let dir = tempfile::tempdir().unwrap();
     cmd(dir.path(), ["init"]).success();
     cmd(dir.path(), ["init"]).failure();
 }
@@ -470,6 +470,42 @@ fn test_cli_pwd_no_repo_fails() {
     cmd("/tmp", ["pwd"]).failure();
 }
 
+// --- config default -----------------------------------------------------------
+
+#[test]
+fn test_cli_config_default_no_args() {
+    // config default does not need a repo to work
+    let dir = tempfile::tempdir().unwrap();
+
+    cmd(dir.path(), ["config", "default"])
+        .success()
+        .stdout(config::DEFAULT_CONFIG);
+}
+
+#[test]
+fn test_cli_config_default_with_args() {
+    let dir = tempfile::tempdir().unwrap();
+
+    cmd(dir.path(), ["config", "default", "log.max"])
+        .success()
+        .stdout("0\n");
+}
+
+#[test]
+fn test_cli_config_default_invalid() {
+    let dir = tempfile::tempdir().unwrap();
+
+    cmd(dir.path(), ["config", "default", "no_exist"])
+        .failure()
+        .stderr(
+            "\
+Error: Unrecognized key `no_exist`, could not find a default value for it
+
+Caused by:
+    `no_exist` not found
+",
+        );
+}
 // --- config get ---------------------------------------------------------------
 
 #[test]
