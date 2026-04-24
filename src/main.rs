@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use clap::{Command, arg, command, value_parser};
 use fl::FL;
 
@@ -46,8 +48,13 @@ fn main() -> anyhow::Result<()> {
                 fl.commit_interactive()?;
             }
         }
-        Some(("log", _)) => {
-            get_fl()?.print_short_log()?;
+        Some(("log", sub)) => {
+            let fl = get_fl()?;
+            if let Some(file) = sub.get_one::<PathBuf>("FILE") {
+                fl.print_log_follow(file.clone())?;
+            } else {
+                fl.print_short_log()?;
+            }
         }
         Some(("config", sub)) => match sub.subcommand() {
             Some(("default", sub)) => {
@@ -141,7 +148,11 @@ fn get_clap_cmd() -> Command {
                         while all other lines will be used as body"),
                     arg!(-e --empty "Commit with no message"),
                 ]),
-            Command::new("log").about("Print history log").alias("l"),
+            Command::new("log")
+                .about("Print history log")
+                .alias("l")
+                .args([arg!([FILE] "Only show commits that affect this file")
+                    .value_parser(value_parser!(PathBuf))]),
             Command::new("config")
                 .about("Edit fl config file")
                 .aliases(["conf", "cfg"])

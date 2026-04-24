@@ -138,33 +138,51 @@ fn test_config_unset_removes_empty_table() {
 
 #[test]
 fn test_config_color_never() {
-    let dir = new_repo();
-    set_config(&dir, r#"color = "never""#);
+    for colored_cmd in [vec!["status"], vec!["log"], vec!["log", "."], vec!["diff"]] {
+        let dir = new_repo();
+        set_config(&dir, r#"color = "never""#);
 
-    cmd(dir.path(), ["-u", "status"])
-        .success()
-        .stdout(predicates::str::contains('\x1b').not());
+        cmd(dir.path(), ["-u", "commit", "msg"]).success();
+        fs::write(dir.path().join("file.txt"), "hi").unwrap();
+        cmd(dir.path(), ["update"]).success();
+
+        cmd(dir.path(), colored_cmd)
+            .success()
+            .stdout(predicates::str::contains('\x1b').not());
+    }
 }
 
 #[test]
 fn test_config_color_always() {
-    let dir = new_repo();
-    set_config(&dir, r#"color = "always""#);
+    for colored_cmd in [vec!["status"], vec!["log", "."], vec!["diff"]] {
+        let dir = new_repo();
+        set_config(&dir, r#"color = "always""#);
 
-    cmd(dir.path(), ["-u", "status"])
-        .success()
-        .stdout(predicates::str::contains('\x1b'));
+        cmd(dir.path(), ["-u", "commit", "msg"]).success();
+        fs::write(dir.path().join("file.txt"), "hi").unwrap();
+        cmd(dir.path(), ["update"]).success();
+
+        cmd(dir.path(), colored_cmd)
+            .success()
+            .stdout(predicates::str::contains('\x1b'));
+    }
 }
 
 #[test]
 fn test_config_color_auto() {
-    let dir = new_repo();
-    set_config(&dir, r#"color = "auto""#);
+    for colored_cmd in [vec!["status"], vec!["log"], vec!["log", "."], vec!["diff"]] {
+        let dir = new_repo();
+        set_config(&dir, r#"color = "auto""#);
 
-    // automatically, it will not print colors because stdout is not a tty in tests
-    cmd(dir.path(), ["-u", "status"])
-        .success()
-        .stdout(predicates::str::contains('\x1b').not());
+        cmd(dir.path(), ["-u", "commit", "msg"]).success();
+        fs::write(dir.path().join("file.txt"), "hi").unwrap();
+        cmd(dir.path(), ["update"]).success();
+
+        // automatically, it will not print colors because stdout is not a tty in tests
+        cmd(dir.path(), colored_cmd)
+            .success()
+            .stdout(predicates::str::contains('\x1b').not());
+    }
 }
 
 #[test]

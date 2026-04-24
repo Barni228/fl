@@ -70,7 +70,7 @@ fn test_cli_update() {
         cmd(dir.path(), [update_cmd]).success();
 
         let fl = FL::new(dir.path().to_path_buf(), false).unwrap();
-        let stage = Commit::from_path(fl.stage_path()).unwrap();
+        let stage = Commit::load_from(fl.stage_path()).unwrap();
 
         assert_eq!(
             Commit {
@@ -175,7 +175,7 @@ fn test_cli_commit_timestamp() {
     assert!(diff < time::Duration::seconds(2));
 }
 
-// --- -u / --update auto-update flag -------------------------------------------
+// --- auto-update flag ---------------------------------------------------------
 #[test]
 fn test_cli_auto_update() {
     for update_flag in ["-u", "--update"] {
@@ -205,7 +205,6 @@ fn test_cli_auto_update() {
     }
 }
 
-/// -U cancels out -u, so no auto update happens
 #[test]
 fn test_cli_no_update_cancels_update() {
     let dir = new_repo();
@@ -437,6 +436,129 @@ fn test_cli_log_no_title_for_empty_commit() {
     cmd(dir.path(), ["log"]).success().stdout(
         "\
         0: No commit message (just now)\n",
+    );
+}
+
+#[test]
+fn test_cli_log_follow() {
+    let dir = new_repo();
+    cmd(dir.path(), ["commit", "empty commit"]).success();
+    cmd(dir.path(), ["-u", "commit", "Added ."]).success();
+
+    fs::write(dir.path().join("file.txt"), "").unwrap();
+    cmd(dir.path(), ["-u", "commit", "Added file.txt"]).success();
+
+    fs::write(dir.path().join("file.txt"), "hello").unwrap();
+    cmd(dir.path(), ["-u", "commit", "Modified file.txt"]).success();
+
+    cmd(dir.path(), ["-u", "commit", "Did nothing"]).success();
+
+    fs::write(dir.path().join("file.txt"), "new").unwrap();
+    cmd(dir.path(), ["-u", "commit", "Modified file.txt again"]).success();
+
+    cmd(dir.path(), ["-u", "commit", "Unrelated commit"]).success();
+
+    cmd(dir.path(), ["log", "file.txt"]).success().stdout(
+        "\
+2: Added file.txt (just now):
+    A  file.txt
+3: Modified file.txt (just now):
+    M  file.txt
+...
+5: Modified file.txt again (just now):
+    M  file.txt
+",
+    );
+}
+
+#[test]
+fn test_cli_log_follow_renames() {
+    let dir = new_repo();
+    cmd(dir.path(), ["commit", "empty commit"]).success();
+    cmd(dir.path(), ["-u", "commit", "Added ."]).success();
+
+    fs::write(dir.path().join("file.txt"), "").unwrap();
+    cmd(dir.path(), ["-u", "commit", "Added file.txt"]).success();
+
+    fs::write(dir.path().join("file.txt"), "hello").unwrap();
+    cmd(dir.path(), ["-u", "commit", "Modified file.txt"]).success();
+
+    fs::rename(dir.path().join("file.txt"), dir.path().join("new_name")).unwrap();
+
+    cmd(dir.path(), ["-u", "commit", "Renamed"]).success();
+
+    fs::write(dir.path().join("new_name"), "new").unwrap();
+    cmd(dir.path(), ["-u", "commit", "Modified again"]).success();
+
+    cmd(dir.path(), ["log", "new_name"]).success().stdout(
+        r#"2: Added file.txt (just now):
+    A  file.txt
+3: Modified file.txt (just now):
+    M  file.txt
+4: Renamed (just now):
+    R  "file.txt" -> "new_name"
+5: Modified again (just now):
+    M  new_name
+"#,
+    );
+}
+
+#[test]
+fn test_cli_log_follow_deleted_then_added() {
+    let dir = new_repo();
+    cmd(dir.path(), ["-u", "commit", "Added ."]).success();
+
+    fs::write(dir.path().join("file.txt"), "").unwrap();
+    cmd(dir.path(), ["-u", "commit", "Added file.txt"]).success();
+
+    fs::write(dir.path().join("file.txt"), "hello").unwrap();
+    cmd(dir.path(), ["-u", "commit", "Modified file.txt"]).success();
+
+    cmd(dir.path(), ["-u", "commit", "Did nothing"]).success();
+
+    fs::remove_file(dir.path().join("file.txt")).unwrap();
+    cmd(dir.path(), ["-u", "commit", "Removed file.txt"]).success();
+
+    fs::write(dir.path().join("file.txt"), "").unwrap();
+    cmd(dir.path(), ["-u", "commit", "Added file.txt again"]).success();
+
+    fs::write(dir.path().join("file.txt"), "hello").unwrap();
+    cmd(dir.path(), ["-u", "commit", "Modified file.txt again"]).success();
+
+    cmd(dir.path(), ["log", "file.txt"]).success().stdout(
+        "\
+5: Added file.txt again (just now):
+    A  file.txt
+6: Modified file.txt again (just now):
+    M  file.txt
+",
+    );
+}
+
+#[test]
+fn test_cli_log_follow_no_exist() {
+    let dir = new_repo();
+    cmd(dir.path(), ["-u", "commit", "Added ."]).success();
+
+    cmd(dir.path(), ["log", "file.txt"]).success().stdout("");
+}
+
+#[test]
+fn test_cli_log_follow_deleted() {
+    let dir = new_repo();
+    fs::write(dir.path().join("file.txt"), "").unwrap();
+    cmd(dir.path(), ["-u", "commit", "Added file.txt"]).success();
+
+    fs::remove_file(dir.path().join("file.txt")).unwrap();
+    cmd(dir.path(), ["-u", "commit", "Removed file.txt"]).success();
+
+    cmd(dir.path(), ["log", "file.txt"]).success().stdout(
+        "\
+0: Added file.txt (just now):
+    A  file.txt
+1: Removed file.txt (just now):
+    D  file.txt
+",
     );
 }
 

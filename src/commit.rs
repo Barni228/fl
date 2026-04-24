@@ -38,7 +38,7 @@ impl Commit {
     }
 
     /// Loads a commit from a file
-    pub fn from_path(path: impl AsRef<Path>) -> Result<Self, CommitError> {
+    pub fn load_from(path: impl AsRef<Path>) -> Result<Self, CommitError> {
         let content = fs::read_to_string(&path)?;
         let commit = serde_json::from_str::<Commit>(&content)?;
         Ok(commit)

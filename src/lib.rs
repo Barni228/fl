@@ -73,6 +73,15 @@ impl<'a> Action<'a> {
             Action::Rename(_, to) => (to, 3),
         }
     }
+
+    fn path(&self) -> &Path {
+        match self {
+            Action::Add(p) => p,
+            Action::Remove(p) => p,
+            Action::Modify(p) => p,
+            Action::Rename(_, to) => to,
+        }
+    }
 }
 
 impl<'a> fmt::Display for Action<'a> {
@@ -262,7 +271,7 @@ impl FL {
         } else {
             let valid_commit = self.to_valid_history_index(commit)?;
             println!("Diffing {valid_commit} and STAGE");
-            Commit::from_path(self.history_file_path(valid_commit))?
+            Commit::load_from(self.history_file_path(valid_commit))?
         };
         self.diff_commits(&target_commit, &stage);
 
@@ -343,7 +352,7 @@ impl FL {
     pub fn get_commit(&self, commit: i32) -> Result<Commit> {
         let valid_commit = self.to_valid_history_index(commit)?;
         let path = self.history_file_path(valid_commit);
-        let commit = Commit::from_path(&path)?;
+        let commit = Commit::load_from(&path)?;
         Ok(commit)
     }
 
@@ -352,7 +361,7 @@ impl FL {
         if self.config.auto_update {
             self.update()?;
         }
-        let stage = Commit::from_path(self.stage_path())?;
+        let stage = Commit::load_from(self.stage_path())?;
         Ok(stage)
     }
 
@@ -363,45 +372,59 @@ impl FL {
         };
 
         for i in start..self.commits {
-            let path = self.history_file_path(i);
-            let commit = Commit::from_path(&path)?;
+            println!("{}", self.format_commit_for_log(i)?);
+        }
 
-            let title = match self.config.log.print_title {
-                true => commit.title.as_deref().unwrap_or("No commit message"),
-                false => "",
+        Ok(())
+    }
+
+    pub fn print_log_follow(&self, mut file: PathBuf) -> Result<()> {
+        self.handle_color();
+
+        let mut lines = Vec::new();
+        let mut commit_skipped = false;
+
+        'commit: for i in (0..self.commits).rev() {
+            let commit = self.get_commit(i)?;
+            let prev = if i > 0 {
+                Commit::load_from(self.history_file_path(i - 1))?
+            } else {
+                Commit::default()
             };
+            let actions = FL::diff_actions_commit(&prev, &commit);
+            let mut skipped = true;
+            for action in actions {
+                if action.path() == file {
+                    skipped = false;
+                    if let Action::Rename(prev_name, _) = action {
+                        file = prev_name.to_path_buf();
+                    }
 
-            let title_quotes = match self.config.log.print_title_quotes {
-                true => "\"",
-                false => "",
-            };
+                    // only add "..." if `lines` is not empty and the last line is not "..."
+                    if commit_skipped && lines.last().is_some_and(|l| l != "...") {
+                        lines.push("...".to_string());
+                    }
+                    lines.push(format!(
+                        "{}:\n    {}",
+                        self.format_commit_for_log(i)?,
+                        action
+                    ));
 
-            let changes = match self.config.log.print_number_of_changes {
-                true => {
-                    let prev_commit = if i > 0 {
-                        Commit::from_path(self.history_file_path(i - 1))?
-                    } else {
-                        Commit::default()
-                    };
-                    let num_changes = FL::diff_actions_commit(&prev_commit, &commit).len();
-                    match num_changes {
-                        1 => " (1 Change)".to_string(),
-                        _ => format!(" ({num_changes} Changes)"),
+                    if self.config.log.max > 0 && lines.len() >= self.config.log.max as usize {
+                        break 'commit;
+                    }
+                    // if this commit added the file, then all previous commits could not affect this file, so ignore them
+                    if matches!(action, Action::Add(_)) {
+                        break 'commit;
                     }
                 }
-                false => "".to_string(),
-            };
+            }
 
-            let time_ago = match self.config.log.print_time_ago {
-                true => format!(" ({})", commit.time_ago()),
-                false => "".to_string(),
-            };
-            let date = match self.config.log.print_date {
-                true => format!(" ({})", commit.date()),
-                false => "".to_string(),
-            };
+            commit_skipped = skipped;
+        }
 
-            println!("{i}: {title_quotes}{title}{title_quotes}{changes}{time_ago}{date}");
+        for line in lines.iter().rev() {
+            println!("{}", line);
         }
 
         Ok(())
@@ -528,7 +551,7 @@ impl FL {
 
         // if there is a previous commit, diff against it
         let prev_commit = if self.commits > 0 {
-            Commit::from_path(self.history_file_path(self.commits - 1))?
+            Commit::load_from(self.history_file_path(self.commits - 1))?
         } else {
             Commit::default()
         };
@@ -556,6 +579,8 @@ impl FL {
             return;
         }
 
+        self.handle_color();
+
         for action in actions {
             if ignore_dir_modifications
                 && let Action::Modify(path) = action
@@ -564,14 +589,60 @@ impl FL {
                 continue;
             }
 
-            match self.config.color {
-                config::ColorOptions::Auto => colored::control::unset_override(),
-                config::ColorOptions::Always => colored::control::set_override(true),
-                config::ColorOptions::Never => colored::control::set_override(false),
-            }
-
             println!("{}", action);
         }
+    }
+
+    fn handle_color(&self) {
+        match self.config.color {
+            config::ColorOptions::Auto => colored::control::unset_override(),
+            config::ColorOptions::Always => colored::control::set_override(true),
+            config::ColorOptions::Never => colored::control::set_override(false),
+        }
+    }
+
+    fn format_commit_for_log(&self, commit_index: i32) -> Result<String> {
+        let path = self.history_file_path(commit_index);
+        let commit = Commit::load_from(&path)?;
+
+        let title = match self.config.log.print_title {
+            true => commit.title.as_deref().unwrap_or("No commit message"),
+            false => "",
+        };
+
+        let title_quotes = match self.config.log.print_title_quotes {
+            true => "\"",
+            false => "",
+        };
+
+        let changes = match self.config.log.print_number_of_changes {
+            true => {
+                let prev_commit = if commit_index > 0 {
+                    Commit::load_from(self.history_file_path(commit_index - 1))?
+                } else {
+                    Commit::default()
+                };
+                let num_changes = FL::diff_actions_commit(&prev_commit, &commit).len();
+                match num_changes {
+                    1 => " (1 Change)".to_string(),
+                    _ => format!(" ({num_changes} Changes)"),
+                }
+            }
+            false => "".to_string(),
+        };
+
+        let time_ago = match self.config.log.print_time_ago {
+            true => format!(" ({})", commit.time_ago()),
+            false => "".to_string(),
+        };
+        let date = match self.config.log.print_date {
+            true => format!(" ({})", commit.date()),
+            false => "".to_string(),
+        };
+
+        Ok(format!(
+            "{commit_index}: {title_quotes}{title}{title_quotes}{changes}{time_ago}{date}"
+        ))
     }
 
     fn diff_actions_commit<'a>(old: &'a Commit, new: &'a Commit) -> Vec<Action<'a>> {

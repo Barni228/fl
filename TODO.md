@@ -6,7 +6,6 @@
 - [ ] Add `add` and `remove` (`rm`) commands that will add/remove files from STAGE
 - [ ] Add a way to edit commit history
 - [ ] Add `show` command which shows what a specific commit did
-- [ ] Add `log --follow` command, that shows every commit that changed a specific file
 - [ ] Add a way to filter commits, like `-ad` for only add or delete actions
 - [ ] Add a way to ignore files/folders, like `.gitignore`
 - [ ] Make `config reset` work even if the current config file is broken
@@ -15,6 +14,7 @@
 - [ ] Add a way to disable global config in local config (like `use_global_config = false`)
 - [ ] Add a way to set every setting with --flags
 - [ ] Make `fl --log-max=10 config set` set `log.max = 10` (or `--max=10`)
+- [ ] `fl commit` Throw error or warning when commit has no changes
 
 ## Bugs / Improvements
 
@@ -28,6 +28,7 @@
 
 ## Done
 
+- [x] Add `log --follow` command, that shows every commit that changed a specific file
 - [x] Make `fl config default log.max` print the default value for `log.max` (`0`)
 - [x] Make `config reset` just delete a key instead of setting it to its default value
 - [x] Bug: `config set` will set something, and then reload config, thus ignoring `-u` and `--no-global` flags

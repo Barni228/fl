@@ -80,7 +80,7 @@ fn test_repo_structure() -> Result<(), Box<dyn std::error::Error>> {
 // --- Errors -------------------------------------------------------------------
 #[test]
 fn test_commit_no_exist() {
-    let err = commit::Commit::from_path("no_exist").unwrap_err();
+    let err = commit::Commit::load_from("no_exist").unwrap_err();
     assert_eq!(
         "I/O error: failed to open file `no_exist`: No such file or directory (os error 2)",
         err.to_string()
