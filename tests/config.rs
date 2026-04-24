@@ -138,7 +138,12 @@ fn test_config_unset_removes_empty_table() {
 
 #[test]
 fn test_config_color_never() {
-    for colored_cmd in [vec!["status"], vec!["log"], vec!["log", "."], vec!["diff"]] {
+    for colored_cmd in [
+        vec!["status"],
+        vec!["log", "."],
+        vec!["show", "0"],
+        vec!["diff"],
+    ] {
         let dir = new_repo();
         set_config(&dir, r#"color = "never""#);
 
@@ -154,7 +159,12 @@ fn test_config_color_never() {
 
 #[test]
 fn test_config_color_always() {
-    for colored_cmd in [vec!["status"], vec!["log", "."], vec!["diff"]] {
+    for colored_cmd in [
+        vec!["status"],
+        vec!["log", "."],
+        vec!["show", "0"],
+        vec!["diff"],
+    ] {
         let dir = new_repo();
         set_config(&dir, r#"color = "always""#);
 
@@ -170,7 +180,12 @@ fn test_config_color_always() {
 
 #[test]
 fn test_config_color_auto() {
-    for colored_cmd in [vec!["status"], vec!["log"], vec!["log", "."], vec!["diff"]] {
+    for colored_cmd in [
+        vec!["status"],
+        vec!["log", "."],
+        vec!["show", "0"],
+        vec!["diff"],
+    ] {
         let dir = new_repo();
         set_config(&dir, r#"color = "auto""#);
 

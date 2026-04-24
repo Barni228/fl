@@ -210,18 +210,50 @@ impl FL {
         commit.save_to(output)
     }
 
+    /// Compare STAGE and the latest commit
     pub fn status(&self) -> Result<()> {
         let stage = self.get_stage()?;
-        let last_commit = match self.commits {
-            0 => commit::Commit::default(),
-            _ => self.get_commit(self.commits - 1)?,
-        };
+        let last_commit = self.get_commit_or_default(self.commits - 1)?;
         let actions = FL::diff_actions_commit(&last_commit, &stage);
 
         // Don't print dir changes, because it will print the files that got changed anyway
         // This will make it feel more like `git status`
         self.print_actions_ignore_dir_mod(&actions, true);
 
+        Ok(())
+    }
+
+    /// Print information about a specific commit
+    /// This will print the commit title, body, and changes
+    pub fn show(&self, commit_index: i32) -> Result<()> {
+        let valid_index = self.to_valid_history_index(commit_index)?;
+
+        let commit = self.get_commit(valid_index)?;
+        let prev_commit = self.get_commit_or_default(valid_index - 1)?;
+        let actions = FL::diff_actions_commit(&prev_commit, &commit);
+
+        // I want [`show`] to print something like log, but in this specific format
+        let changes = {
+            let prev_commit = self.get_commit_or_default(commit_index - 1)?;
+            let num_changes = FL::diff_actions_commit(&prev_commit, &commit).len();
+            match num_changes {
+                1 => "1 Change".to_string(),
+                _ => format!("{num_changes} Changes"),
+            }
+        };
+        println!(
+            "{valid_index}: {title} ({changes}) ({time_ago}) ({date})",
+            title = commit.title(),
+            time_ago = commit.time_ago(),
+            date = commit.date()
+        );
+
+        println!("Title:\n    {}", commit.title());
+        println!("Body:\n    {}", commit.body().replace('\n', "\n    "));
+        println!();
+        println!("Changes:");
+
+        self.print_actions_ignore_dir_mod(&actions, true);
         Ok(())
     }
 
@@ -349,9 +381,11 @@ impl FL {
         self.commit_message(&message)
     }
 
-    pub fn get_commit(&self, commit: i32) -> Result<Commit> {
-        let valid_commit = self.to_valid_history_index(commit)?;
-        let path = self.history_file_path(valid_commit);
+    /// Load a commit from the repository at [`commit_index`] index
+    /// This will expand negative indexes with [`FL::to_valid_history_index`]
+    pub fn get_commit(&self, commit_index: i32) -> Result<Commit> {
+        let valid_index = self.to_valid_history_index(commit_index)?;
+        let path = self.history_file_path(valid_index);
         let commit = Commit::load_from(&path)?;
         Ok(commit)
     }
@@ -386,12 +420,8 @@ impl FL {
 
         'commit: for i in (0..self.commits).rev() {
             let commit = self.get_commit(i)?;
-            let prev = if i > 0 {
-                Commit::load_from(self.history_file_path(i - 1))?
-            } else {
-                Commit::default()
-            };
-            let actions = FL::diff_actions_commit(&prev, &commit);
+            let prev_commit = self.get_commit_or_default(i - 1)?;
+            let actions = FL::diff_actions_commit(&prev_commit, &commit);
             let mut skipped = true;
             for action in actions {
                 if action.path() == file {
@@ -550,11 +580,7 @@ impl FL {
         let out_path = self.history_file_path(self.commits);
 
         // if there is a previous commit, diff against it
-        let prev_commit = if self.commits > 0 {
-            Commit::load_from(self.history_file_path(self.commits - 1))?
-        } else {
-            Commit::default()
-        };
+        let prev_commit = self.get_commit_or_default(self.commits - 1)?;
 
         let changes = FL::diff_actions_commit(&prev_commit, commit).len();
         println!("Committing {} changes", changes);
@@ -562,6 +588,18 @@ impl FL {
         commit.save_to(out_path)?;
         self.commits += 1;
         Ok(())
+    }
+
+    /// load a [`commit::Commit`] object from a specific commit index
+    /// This will NOT validate the index, so negative numbers always return [`Commit::default`]
+    /// Return an error if the commit file could not be read
+    fn get_commit_or_default(&self, valid_commit_index: i32) -> Result<Commit> {
+        let commit = if 0 <= valid_commit_index && valid_commit_index < self.commits {
+            Commit::load_from(self.history_file_path(valid_commit_index))?
+        } else {
+            Commit::default()
+        };
+        Ok(commit)
     }
 
     fn diff_commits(&self, old: &Commit, new: &Commit) {
@@ -593,6 +631,7 @@ impl FL {
         }
     }
 
+    /// read [`FL::config`], and enable/disable `colored` crate
     fn handle_color(&self) {
         match self.config.color {
             config::ColorOptions::Auto => colored::control::unset_override(),
@@ -606,8 +645,8 @@ impl FL {
         let commit = Commit::load_from(&path)?;
 
         let title = match self.config.log.print_title {
-            true => commit.title.as_deref().unwrap_or("No commit message"),
-            false => "",
+            true => commit.title(),
+            false => "".to_string(),
         };
 
         let title_quotes = match self.config.log.print_title_quotes {
@@ -617,11 +656,7 @@ impl FL {
 
         let changes = match self.config.log.print_number_of_changes {
             true => {
-                let prev_commit = if commit_index > 0 {
-                    Commit::load_from(self.history_file_path(commit_index - 1))?
-                } else {
-                    Commit::default()
-                };
+                let prev_commit = self.get_commit_or_default(commit_index - 1)?;
                 let num_changes = FL::diff_actions_commit(&prev_commit, &commit).len();
                 match num_changes {
                     1 => " (1 Change)".to_string(),

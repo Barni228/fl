@@ -230,7 +230,7 @@ fn test_cli_no_update_cancels_update() {
 
 #[test]
 fn test_cli_status() {
-    for status_cmd in ["status", "st", "s"] {
+    for status_cmd in ["status", "st"] {
         let dir = new_repo();
         cmd(dir.path(), ["-u", "commit", "-e"]).success();
         fs::write(dir.path().join("file.txt"), "hello").unwrap();
@@ -435,7 +435,7 @@ fn test_cli_log_no_title_for_empty_commit() {
 
     cmd(dir.path(), ["log"]).success().stdout(
         "\
-        0: No commit message (just now)\n",
+        0: <no title> (just now)\n",
     );
 }
 
@@ -560,6 +560,38 @@ fn test_cli_log_follow_deleted() {
     D  file.txt
 ",
     );
+}
+
+// --- show ---------------------------------------------------------------------
+
+#[test]
+fn test_cli_show_no_commits() {
+    let dir = new_repo();
+    cmd(dir.path(), ["show", "0"])
+        .failure()
+        .stderr("Error: fatal: Invalid commit index: 0 (no commits exist)\n");
+}
+
+#[test]
+fn test_cli_show() {
+    let dir = new_repo();
+    cmd(dir.path(), ["-u", "commit", "Title"]).success();
+    let today = time::OffsetDateTime::now_utc().date();
+
+    for i in ["0", "-1"] {
+        cmd(dir.path(), ["show", i]).success().stdout(format!(
+            "\
+0: Title (1 Change) (just now) ({today})
+Title:
+    Title
+Body:
+    <no body>
+
+Changes:
+A  .
+",
+        ));
+    }
 }
 
 // --- pwd ----------------------------------------------------------------------

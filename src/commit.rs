@@ -60,7 +60,7 @@ impl Commit {
         if let Some(ts) = self.timestamp {
             time_ago(ts)
         } else {
-            "<missing timestamp>".to_string()
+            "<no timestamp>".to_string()
         }
     }
 
@@ -68,8 +68,16 @@ impl Commit {
         if let Some(ts) = self.timestamp {
             ts.date().to_string()
         } else {
-            "<missing timestamp>".to_string()
+            "<no timestamp>".to_string()
         }
+    }
+
+    pub fn title(&self) -> String {
+        self.title.clone().unwrap_or("<no title>".to_string())
+    }
+
+    pub fn body(&self) -> String {
+        self.body.clone().unwrap_or("<no body>".to_string())
     }
 }
 
@@ -91,7 +99,7 @@ fn time_ago(ts: OffsetDateTime) -> String {
     } else if delta < Duration::days(7) {
         let days = delta.whole_days();
         format!("{} day{} ago", days, if days != 1 { "s" } else { "" })
-    } else if delta < Duration::weeks(4) {
+    } else if delta < Duration::weeks(5) {
         let weeks = delta.whole_weeks();
         format!("{} week{} ago", weeks, if weeks != 1 { "s" } else { "" })
     } else if delta < Duration::days(365) {

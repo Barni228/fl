@@ -5,7 +5,6 @@
 - [ ] maybe create a `fix` command that fixes invalid `.fl/` folder
 - [ ] Add `add` and `remove` (`rm`) commands that will add/remove files from STAGE
 - [ ] Add a way to edit commit history
-- [ ] Add `show` command which shows what a specific commit did
 - [ ] Add a way to filter commits, like `-ad` for only add or delete actions
 - [ ] Add a way to ignore files/folders, like `.gitignore`
 - [ ] Make `config reset` work even if the current config file is broken
@@ -28,6 +27,7 @@
 
 ## Done
 
+- [x] Add `show` command which shows what a specific commit did
 - [x] Add `log --follow` command, that shows every commit that changed a specific file
 - [x] Make `fl config default log.max` print the default value for `log.max` (`0`)
 - [x] Make `config reset` just delete a key instead of setting it to its default value

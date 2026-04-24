@@ -56,6 +56,11 @@ fn main() -> anyhow::Result<()> {
                 fl.print_short_log()?;
             }
         }
+        Some(("show", sub)) => {
+            let fl = get_fl()?;
+            let commit_index = *sub.get_one::<i32>("COMMIT").unwrap();
+            fl.show(commit_index)?;
+        }
         Some(("config", sub)) => match sub.subcommand() {
             Some(("default", sub)) => {
                 if let Some(key) = sub.get_one::<String>("KEY") {
@@ -127,7 +132,7 @@ fn get_clap_cmd() -> Command {
                 .alias("u"),
             Command::new("status")
                 .about("Print changes to files compared to last commit")
-                .aliases(["s", "st"]),
+                .alias("st"),
             Command::new("diff")
                 .about("Print what has changed between 2 commits")
                 .alias("d")
@@ -151,8 +156,15 @@ fn get_clap_cmd() -> Command {
             Command::new("log")
                 .about("Print history log")
                 .alias("l")
-                .args([arg!([FILE] "Only show commits that affect this file")
-                    .value_parser(value_parser!(PathBuf))]),
+                .arg(
+                    arg!([FILE] "Only show commits that affect this file")
+                        .value_parser(value_parser!(PathBuf)),
+                ),
+            Command::new("show").about("Show a commit").alias("sh").arg(
+                arg!([COMMIT] "Commit to show")
+                    .value_parser(value_parser!(i32))
+                    .allow_negative_numbers(true),
+            ),
             Command::new("config")
                 .about("Edit fl config file")
                 .aliases(["conf", "cfg"])
