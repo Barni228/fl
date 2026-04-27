@@ -19,12 +19,11 @@ pub(crate) mod toml_helper;
 /// Alias for a `Result` with the error type [`crate::Error`]
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
-#[derive(thiserror::Error, Debug)]
+#[derive(Debug, thiserror::Error, miette::Diagnostic)]
 pub enum Error {
     #[error("fatal: not inside an fl repository (or any of the parent directories): `{0}`")]
     RepoNotFound(PathBuf),
 
-    // NOTE: because anyhow already prints the inner `#[from]` error, I don't need to have `{0}`
     #[error("Failed to parse config")]
     InvalidConfig(#[from] conf::ConfigError),
 
@@ -201,14 +200,15 @@ impl FL {
     ///
     /// This generates a file list for the root directory and writes it
     /// to a new history file with the next commit index.
-    pub fn update(&self) -> io::Result<()> {
+    pub fn update(&self) -> Result<()> {
         let mut fl = self.get_filelist();
         let mut commit = commit::Commit::default();
         let output = self.stage_path();
 
         commit.snapshot = fl.hash_paths(&[&self.root]);
 
-        commit.save_to(output)
+        commit.save_to(output)?;
+        Ok(())
     }
 
     /// Compare STAGE and the latest commit

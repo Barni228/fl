@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use clap::{Command, arg, command, value_parser};
 use fl::FL;
 
-fn main() -> anyhow::Result<()> {
+fn main() -> miette::Result<()> {
     let matches = get_clap_cmd().get_matches();
     let use_global = !matches.get_flag("no-global");
 

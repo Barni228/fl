@@ -171,3 +171,10 @@ fn test_check_invalid_commit() {
     assert_eq!(index, 0);
     assert_eq!(path, dir.path().join(".fl/history/00000000.json"));
 }
+
+#[test]
+fn test_check_no_issues() {
+    let dir = new_repo();
+    let warnings = check(dir.path().to_path_buf());
+    assert!(warnings.is_empty());
+}

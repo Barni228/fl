@@ -5,23 +5,34 @@ use std::path::PathBuf;
 
 // --- Repo: automatically find the current repo --------------------------------
 
+#[must_use]
+fn new_repo() -> tempfile::TempDir {
+    let dir = tempfile::tempdir().unwrap();
+    FL::create_fl_repo(dir.path().to_path_buf()).unwrap();
+    dir
+}
+
 #[test]
 fn test_repo_find() {
+    let dir = new_repo();
     assert_eq!(
-        Some(PathBuf::from("test_repo")),
-        find_fl_path("test_repo".into())
+        Some(dir.path().to_path_buf()),
+        find_fl_path(dir.path().to_path_buf())
     );
 }
 
 #[test]
 fn test_repo_parent() {
+    let dir = new_repo();
+    fs::create_dir_all(dir.path().join("subfolder/sub-sub-folder")).unwrap();
+
     assert_eq!(
-        Some(PathBuf::from("test_repo")),
-        find_fl_path("test_repo/subfolder".into())
+        Some(dir.path().to_path_buf()),
+        find_fl_path(dir.path().join("subfolder"))
     );
     assert_eq!(
-        Some(PathBuf::from("test_repo")),
-        find_fl_path("test_repo/subfolder/sub-sub-folder".into())
+        Some(dir.path().to_path_buf()),
+        find_fl_path(dir.path().join("subfolder").join("sub-sub-folder"))
     );
 }
 

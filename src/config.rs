@@ -21,7 +21,7 @@ use std::{env, fs};
 /// ```
 pub const DEFAULT_CONFIG: &str = include_str!("../default_config.toml");
 
-#[derive(thiserror::Error, Debug)]
+#[derive(Debug, thiserror::Error, miette::Diagnostic)]
 pub enum ConfigError {
     #[error("I/O error")]
     IOError(#[from] std::io::Error),

@@ -74,6 +74,10 @@ pub enum CheckWarning {
 pub fn print_warnings(mut warnings: Vec<CheckWarning>) {
     warnings.sort_by_key(|w| w.severity().unwrap_or_default());
 
+    if warnings.is_empty() {
+        println!("No issues found");
+    }
+
     for warning in warnings {
         println!("{:?}", miette::Report::new(warning));
     }

@@ -5,7 +5,6 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-anyhow = "1.0.102"
 clap = { version = "4.6.0", features = ["cargo"] }
 colored = "3.1.1"
 conf = { version = "0.15.22", package = "config", default-features = false, features = ["toml"] }

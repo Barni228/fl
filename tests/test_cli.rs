@@ -379,12 +379,12 @@ fn test_cli_diff_invalid_commit_error_message() {
     // no commits exist, so index 99 is invalid
     cmd(dir.path(), ["diff", "99"])
         .failure()
-        .stderr("Error: fatal: Invalid commit index: 99 (no commits exist)\n");
+        .stderr("Error:   × fatal: Invalid commit index: 99 (no commits exist)\n\n");
     cmd(dir.path(), ["commit", "-e"]).success();
 
     cmd(dir.path(), ["diff", "99"])
         .failure()
-        .stderr("Error: fatal: Invalid commit index: 99 (must be between -1 and 0)\n");
+        .stderr("Error:   × fatal: Invalid commit index: 99 (must be between -1 and 0)\n\n");
 }
 
 #[test]
@@ -569,7 +569,7 @@ fn test_cli_show_no_commits() {
     let dir = new_repo();
     cmd(dir.path(), ["show", "0"])
         .failure()
-        .stderr("Error: fatal: Invalid commit index: 0 (no commits exist)\n");
+        .stderr("Error:   × fatal: Invalid commit index: 0 (no commits exist)\n\n");
 }
 
 #[test]
@@ -653,10 +653,9 @@ fn test_cli_config_default_invalid() {
         .failure()
         .stderr(
             "\
-Error: Unrecognized key `no_exist`, could not find a default value for it
+Error:   × Unrecognized key `no_exist`, could not find a default value for it
+  ╰─▶ `no_exist` not found
 
-Caused by:
-    `no_exist` not found
 ",
         );
 }
@@ -695,13 +694,14 @@ fn test_cli_config_get_nonexistent_key_fails() {
     let dir = new_repo();
     cmd(dir.path(), ["config", "get", "log.does_not_exist"])
         .failure()
-        .stderr(concat!(
-            "Error: Config error\n",
-            "\n",
-            "Caused by:\n",
-            "    0: Failed to get `log.does_not_exist` in config file\n",
-            "    1: `log.does_not_exist` not found\n",
-        ));
+        .stderr(
+            "\
+Error:   × Config error
+  ├─▶ Failed to get `log.does_not_exist` in config file
+  ╰─▶ `log.does_not_exist` not found
+
+",
+        );
 }
 
 // --- config set ---------------------------------------------------------------
@@ -781,11 +781,11 @@ fn test_cli_config_set_invalid_key_fails() {
         .stdout("Error Detected, config not updated\n")
         .stderr(
             "\
-Error: Config error
+Error:   × Config error
+  ├─▶ Failed to parse config
+  ╰─▶ unknown field `nonexistent`, expected one of `color`, `auto_update`,
+      `rm_commit_file`, `editor`, `log`
 
-Caused by:
-    0: Failed to parse config
-    1: unknown field `nonexistent`, expected one of `color`, `auto_update`, `rm_commit_file`, `editor`, `log`
 ",
         );
 }
@@ -799,11 +799,11 @@ fn test_cli_config_set_invalid_value_fails() {
         .stdout("Error Detected, config not updated\n")
         .stderr(
             "\
-Error: Config error
+Error:   × Config error
+  ├─▶ Failed to parse config
+  ╰─▶ invalid type: string \"not_a_number\", expected an integer for key
+      `log.max`
 
-Caused by:
-    0: Failed to parse config
-    1: invalid type: string \"not_a_number\", expected an integer for key `log.max`
 ",
         );
 }
@@ -841,11 +841,10 @@ fn test_cli_config_set_default_no_exist_key() {
         .stdout("Error Detected, config not updated\n")
         .stderr(
             "\
-Error: Config error
+Error:   × Config error
+  ├─▶ Unrecognized key `log.no_exist`, could not find a default value for it
+  ╰─▶ `log.no_exist` not found
 
-Caused by:
-    0: Unrecognized key `log.no_exist`, could not find a default value for it
-    1: `log.no_exist` not found
 ",
         );
 }
@@ -886,11 +885,10 @@ fn test_cli_config_unset_no_exist_key() {
             .stdout("Error Detected, config not updated\n")
             .stderr(
                 "\
-Error: Config error
+Error:   × Config error
+  ├─▶ Unrecognized key `log.no_exist`, could not find a default value for it
+  ╰─▶ `log.no_exist` not found
 
-Caused by:
-    0: Unrecognized key `log.no_exist`, could not find a default value for it
-    1: `log.no_exist` not found
 ",
             );
     }
