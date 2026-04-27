@@ -9,7 +9,7 @@ use std::path::PathBuf;
 fn test_repo_find() {
     assert_eq!(
         Some(PathBuf::from("test_repo")),
-        FL::find_fl_path("test_repo".into())
+        find_fl_path("test_repo".into())
     );
 }
 
@@ -17,18 +17,18 @@ fn test_repo_find() {
 fn test_repo_parent() {
     assert_eq!(
         Some(PathBuf::from("test_repo")),
-        FL::find_fl_path("test_repo/subfolder".into())
+        find_fl_path("test_repo/subfolder".into())
     );
     assert_eq!(
         Some(PathBuf::from("test_repo")),
-        FL::find_fl_path("test_repo/subfolder/sub-sub-folder".into())
+        find_fl_path("test_repo/subfolder/sub-sub-folder".into())
     );
 }
 
 #[test]
 fn test_repo_not_found() {
     // the root folder is probably not a fl repo, at least I hope so...
-    assert_eq!(None, FL::find_fl_path("/".into()));
+    assert_eq!(None, find_fl_path("/".into()));
 }
 
 #[test]

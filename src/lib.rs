@@ -10,6 +10,7 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process;
 
+pub mod check;
 pub mod commit;
 pub mod config;
 mod rename_detection;
@@ -151,7 +152,7 @@ impl FL {
     /// Creates a new `FL` instance by locating a `.fl` repository
     /// starting from the current directory and walking up parent directories.
     pub fn in_current_dir(use_global: bool) -> Result<FL> {
-        let fl = FL::new(FL::find_root_path()?, use_global)?;
+        let fl = FL::new(find_root_path()?, use_global)?;
         Ok(fl)
     }
 
@@ -799,26 +800,6 @@ impl FL {
         }
     }
 
-    fn find_root_path() -> Result<PathBuf> {
-        let dir = env::current_dir()?;
-
-        FL::find_fl_path(dir.clone()).ok_or(Error::RepoNotFound(dir))
-    }
-
-    fn find_fl_path(mut dir: PathBuf) -> Option<PathBuf> {
-        loop {
-            // if dir contains `.fl` folder, return it
-            if dir.join(".fl").is_dir() {
-                return Some(dir);
-            }
-
-            // go one level up, or if there are no more parents then return None
-            if !dir.pop() {
-                return None;
-            }
-        }
-    }
-
     /// returns a pre-configured filelist for this repo
     fn get_filelist(&self) -> FileList {
         let mut fl = FileList::new();
@@ -828,6 +809,26 @@ impl FL {
         fl.set_relative_to(&self.root); // output everything relative to the root, so that this works even if root folder is moved
         fl.set_use_progress_bar(true); // show progress bar, so that user knows how much to wait
         fl
+    }
+}
+
+fn find_root_path() -> Result<PathBuf> {
+    let dir = env::current_dir()?;
+
+    find_fl_path(dir.clone()).ok_or(Error::RepoNotFound(dir))
+}
+
+fn find_fl_path(mut dir: PathBuf) -> Option<PathBuf> {
+    loop {
+        // if dir contains `.fl` folder, return it
+        if dir.join(".fl").is_dir() {
+            return Some(dir);
+        }
+
+        // go one level up, or if there are no more parents then return None
+        if !dir.pop() {
+            return None;
+        }
     }
 }
 

@@ -103,6 +103,15 @@ fn main() -> anyhow::Result<()> {
             }
             _ => {}
         },
+        Some(("check", _)) => {
+            // try to update if possible, so that `check` can check an up to date STAGE file
+            if let Ok(fl) = get_fl() {
+                let _ = fl.update();
+            }
+
+            let warnings = fl::check::check_current_dir();
+            fl::check::print_warnings(warnings);
+        }
         Some(("pwd", _)) => {
             println!("{}", get_fl()?.root().display());
         }
@@ -193,6 +202,7 @@ fn get_clap_cmd() -> Command {
                         .alias("reset")
                         .arg(arg!(<KEY> "Key to reset to default")),
                 ]),
+            Command::new("check").about("Check if fl repo is valid"),
             Command::new("pwd")
                 .about("Print the current fl repo path")
                 .alias("p"),

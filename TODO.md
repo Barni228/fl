@@ -1,7 +1,5 @@
 ## Features
 
-- [ ] Add something like `check`, that checks if everything is alright
-      so it will print warnings if some file hashes are `ERROR: ...`, or if fl repo is broken
 - [ ] maybe create a `fix` command that fixes invalid `.fl/` folder
 - [ ] Add `add` and `remove` (`rm`) commands that will add/remove files from STAGE
 - [ ] Add a way to edit commit history
@@ -24,9 +22,13 @@
 - [ ] When counting how many changes a commit made, dont do nice rename detection (should make things faster)
 - [ ] Improve how I edit toml (maybe create a new project that expands on `toml_edit`)
 - [ ] Now that Config has a private `use_global`, use that in the getters and setters
+- [ ] Make `check` `BadHash` actually have the error, not string like "ERROR: permission denied"
+- [ ] `check` add help messages to every error
 
 ## Done
 
+- [x] Add something like `check`, that checks if everything is alright
+      so it will print warnings if some file hashes are `ERROR: ...`, or if fl repo is broken
 - [x] Add `show` command which shows what a specific commit did
 - [x] Add `log --follow` command, that shows every commit that changed a specific file
 - [x] Make `fl config default log.max` print the default value for `log.max` (`0`)
