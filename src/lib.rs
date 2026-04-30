@@ -806,6 +806,12 @@ impl FL {
         fl.set_hash_length(64); // show 64 chars of hash, to minimize chance of collision
         fl.hasher_mut().set_all(false); // don't track hidden files
         fl.hasher_mut().set_hash_directory(true); // track directories
+        fl.hasher_mut().set_ignore(self.config.track.ignore);
+        fl.hasher_mut().set_gitignore(self.config.track.ignore_git);
+        fl.hasher_mut()
+            .set_global_gitignore(self.config.track.ignore_git);
+        fl.hasher_mut()
+            .set_git_exclude(self.config.track.ignore_git);
         fl.set_relative_to(&self.root); // output everything relative to the root, so that this works even if root folder is moved
         fl.set_use_progress_bar(true); // show progress bar, so that user knows how much to wait
         fl

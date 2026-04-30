@@ -4,7 +4,6 @@
 - [ ] Add `add` and `remove` (`rm`) commands that will add/remove files from STAGE
 - [ ] Add a way to edit commit history
 - [ ] Add a way to filter commits, like `-ad` for only add or delete actions
-- [ ] Add a way to ignore files/folders, like `.gitignore`
 - [ ] Make `config reset` work even if the current config file is broken
 - [ ] Make `config set editor.command "code -w"` work (`command = ["code", "-w"]`)
 - [ ] Add `config --global set ...` which will set things on global config file (`~/.config/fl/config.toml`)
@@ -12,6 +11,7 @@
 - [ ] Add a way to set every setting with --flags
 - [ ] Make `fl --log-max=10 config set` set `log.max = 10` (or `--max=10`)
 - [ ] `fl commit` Throw error or warning when commit has no changes
+- [ ] When printing paths, add trailing `/` to directories (diff, status)
 
 ## Bugs / Improvements
 
@@ -27,6 +27,7 @@
 
 ## Done
 
+- [x] Add a way to ignore files/folders, like `.gitignore`
 - [x] Add something like `check`, that checks if everything is alright
       so it will print warnings if some file hashes are `ERROR: ...`, or if fl repo is broken
 - [x] Add `show` command which shows what a specific commit did

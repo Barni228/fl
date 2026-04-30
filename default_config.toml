@@ -5,6 +5,16 @@ auto_update = false
 # if true, automatically remove the FL_COMMIT_MESSAGE file
 rm_commit_file = false
 
+
+# This decides which files to track and which to ignore
+[track]
+# if true, this will respect `.ignore` files (same syntax as .gitignore, but not git specific)
+ignore = true
+# if true, this will respect `.gitignore`, and other git ignore files
+ignore_git = false
+
+
+# This configures which editor to use and how (for interactive commit, etc)
 [editor]
 # Editor to use, leave empty for default ("$EDITOR" if exists, or "vim" otherwise)
 # You can use env variable by prefixing with `$`, and extra args by just adding them to array
@@ -13,6 +23,8 @@ command = []
 # enable this if your editor exits before saving the file (e.g. VSCode by default)
 ask_confirm = false
 
+
+# This configures the style of `log` command
 [log]
 # Maximum number of most recent commits to print, set to 0 to print all
 max = 0

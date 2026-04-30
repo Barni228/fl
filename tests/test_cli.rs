@@ -784,7 +784,7 @@ fn test_cli_config_set_invalid_key_fails() {
 Error:   × Config error
   ├─▶ Failed to parse config
   ╰─▶ unknown field `nonexistent`, expected one of `color`, `auto_update`,
-      `rm_commit_file`, `editor`, `log`
+      `rm_commit_file`, `track`, `editor`, `log`
 
 ",
         );

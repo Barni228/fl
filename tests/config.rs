@@ -256,7 +256,7 @@ fn test_config_rm_commit_file_false() {
     set_config(
         &dir,
         "rm_commit_file = false\n\
-        editor.command = [\"true\"]",
+         editor.command = [\"true\"]",
     );
     cmd(dir.path(), ["commit"]).success();
 
@@ -270,7 +270,7 @@ fn test_config_rm_commit_file_true() {
     set_config(
         &dir,
         "rm_commit_file = true\n\
-        editor.command = [\"true\"]",
+         editor.command = [\"true\"]",
     );
 
     cmd(dir.path(), ["commit"]).success();
@@ -278,6 +278,89 @@ fn test_config_rm_commit_file_true() {
     assert!(!msg_path.exists());
 }
 
+// --- track.ignore -------------------------------------------------------------
+
+#[test]
+fn test_config_track_ignore_false() {
+    let dir = new_repo();
+    set_config(&dir, "track.ignore = false");
+    fs::write(dir.path().join(".ignore"), "*.txt").unwrap();
+    fs::write(dir.path().join("file.txt"), "ignored").unwrap();
+    fs::write(dir.path().join("poppy.yay"), "not ignored").unwrap();
+
+    cmd(dir.path(), ["-u", "status"]).success().stdout(
+        "A  .\n\
+         A  file.txt\n\
+         A  poppy.yay\n",
+    );
+}
+
+#[test]
+fn test_config_track_ignore_true() {
+    let dir = new_repo();
+    set_config(&dir, "track.ignore = true");
+    fs::write(dir.path().join(".ignore"), "*.txt").unwrap();
+    fs::write(dir.path().join("file.txt"), "ignored").unwrap();
+    fs::write(dir.path().join("poppy.yay"), "not ignored").unwrap();
+
+    cmd(dir.path(), ["-u", "status"]).success().stdout(
+        "A  .\n\
+         A  poppy.yay\n",
+    );
+}
+
+#[test]
+fn test_config_track_ignore_git_false() {
+    let dir = new_repo();
+    set_config(&dir, "track.ignore_git = false");
+    fs::write(dir.path().join(".gitignore"), "*.txt").unwrap();
+    fs::write(dir.path().join("file.txt"), "ignored").unwrap();
+    fs::write(dir.path().join("poppy.yay"), "not ignored").unwrap();
+
+    cmd(dir.path(), ["-u", "status"]).success().stdout(
+        "A  .\n\
+         A  file.txt\n\
+         A  poppy.yay\n",
+    );
+}
+
+#[test]
+fn test_config_track_ignore_git_not_repo() {
+    let dir = new_repo();
+    set_config(&dir, "track.ignore_git = true");
+
+    // `ignore` crate only respects .gitignore if it is in a valid git repo
+    // since this is not a valid git repo (just a random file named `.gitignore`),
+    // nothing special happens (not a bug, use `.ignore` if u need ignore without git)
+    fs::write(dir.path().join(".gitignore"), "*.txt").unwrap();
+    fs::write(dir.path().join("file.txt"), "ignored").unwrap();
+    fs::write(dir.path().join("poppy.yay"), "not ignored").unwrap();
+
+    cmd(dir.path(), ["-u", "status"]).success().stdout(
+        "A  .\n\
+         A  file.txt\n\
+         A  poppy.yay\n",
+    );
+}
+
+#[test]
+fn test_config_track_ignore_git_repo() {
+    let dir = new_repo();
+    set_config(&dir, "track.ignore_git = true");
+
+    // because `.git` folder exists, this is probably a git repo
+    // so .gitignore is respected
+    fs::create_dir(dir.path().join(".git")).unwrap();
+
+    fs::write(dir.path().join(".gitignore"), "*.txt").unwrap();
+    fs::write(dir.path().join("file.txt"), "ignored").unwrap();
+    fs::write(dir.path().join("poppy.yay"), "not ignored").unwrap();
+
+    cmd(dir.path(), ["-u", "status"]).success().stdout(
+        "A  .\n\
+         A  poppy.yay\n",
+    );
+}
 // --- log.max ------------------------------------------------------------------
 
 #[test]
@@ -291,8 +374,8 @@ fn test_config_log_max_0_shows_all() {
 
     cmd(dir.path(), ["log"]).success().stdout(
         "0: first (just now)\n\
-        1: second (just now)\n\
-        2: third (just now)\n",
+         1: second (just now)\n\
+         2: third (just now)\n",
     );
 }
 
@@ -307,7 +390,7 @@ fn test_config_log_max_2() {
 
     cmd(dir.path(), ["log"]).success().stdout(
         "1: second (just now)\n\
-        2: third (just now)\n",
+         2: third (just now)\n",
     );
 }
 
@@ -518,7 +601,7 @@ fn test_config_log_nothing() {
 
     cmd(dir.path(), ["log"]).success().stdout(
         "0: \n\
-        1: \n",
+         1: \n",
     );
 }
 
@@ -562,8 +645,8 @@ fn test_config_local_overrides_global() {
         .success()
         .stdout(
             "0: first (just now)\n\
-            1: second (just now)\n\
-            2: third (just now)\n",
+             1: second (just now)\n\
+             2: third (just now)\n",
         );
 }
 

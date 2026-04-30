@@ -65,11 +65,28 @@ pub struct Config {
     pub color: ColorOptions,
     pub auto_update: bool,
     pub rm_commit_file: bool,
+    pub track: Track,
     pub editor: Editor,
     pub log: Log,
 
     #[serde(skip)]
     use_global: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct Track {
+    pub ignore: bool,
+    pub ignore_git: bool,
+}
+
+impl Default for Track {
+    fn default() -> Self {
+        Self {
+            ignore: true,
+            ignore_git: false,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -90,18 +107,6 @@ pub struct Log {
     pub print_date: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(deny_unknown_fields)]
-#[serde(rename_all = "lowercase")]
-pub enum ColorOptions {
-    #[default]
-    Auto,
-    Always,
-    Never,
-}
-
-// Defaults
-
 impl Default for Log {
     fn default() -> Self {
         Self {
@@ -113,6 +118,16 @@ impl Default for Log {
             print_date: false,
         }
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
+#[serde(rename_all = "lowercase")]
+pub enum ColorOptions {
+    #[default]
+    Auto,
+    Always,
+    Never,
 }
 
 impl FromStr for Config {
