@@ -628,7 +628,11 @@ impl FL {
                 continue;
             }
 
-            println!("{}", action);
+            if action.path().is_dir() {
+                println!("{}/", action);
+            } else {
+                println!("{}", action)
+            }
         }
     }
 

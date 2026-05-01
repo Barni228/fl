@@ -234,7 +234,7 @@ fn test_config_auto_update_false() {
     cmd(dir.path(), ["status"]).success().stdout("No changes\n");
 
     cmd(dir.path(), ["update"]).success();
-    cmd(dir.path(), ["status"]).success().stdout("A  .\n");
+    cmd(dir.path(), ["status"]).success().stdout("A  ./\n");
 }
 
 #[test]
@@ -243,7 +243,7 @@ fn test_config_auto_update_true() {
     set_config(&dir, "auto_update = true");
 
     // auto update is true, so update is run automatically
-    cmd(dir.path(), ["status"]).success().stdout("A  .\n");
+    cmd(dir.path(), ["status"]).success().stdout("A  ./\n");
 }
 
 // --- rm_commit_file -----------------------------------------------------------
@@ -289,7 +289,7 @@ fn test_config_track_ignore_false() {
     fs::write(dir.path().join("poppy.yay"), "not ignored").unwrap();
 
     cmd(dir.path(), ["-u", "status"]).success().stdout(
-        "A  .\n\
+        "A  ./\n\
          A  file.txt\n\
          A  poppy.yay\n",
     );
@@ -304,7 +304,7 @@ fn test_config_track_ignore_true() {
     fs::write(dir.path().join("poppy.yay"), "not ignored").unwrap();
 
     cmd(dir.path(), ["-u", "status"]).success().stdout(
-        "A  .\n\
+        "A  ./\n\
          A  poppy.yay\n",
     );
 }
@@ -318,7 +318,7 @@ fn test_config_track_ignore_git_false() {
     fs::write(dir.path().join("poppy.yay"), "not ignored").unwrap();
 
     cmd(dir.path(), ["-u", "status"]).success().stdout(
-        "A  .\n\
+        "A  ./\n\
          A  file.txt\n\
          A  poppy.yay\n",
     );
@@ -337,7 +337,7 @@ fn test_config_track_ignore_git_not_repo() {
     fs::write(dir.path().join("poppy.yay"), "not ignored").unwrap();
 
     cmd(dir.path(), ["-u", "status"]).success().stdout(
-        "A  .\n\
+        "A  ./\n\
          A  file.txt\n\
          A  poppy.yay\n",
     );
@@ -357,7 +357,7 @@ fn test_config_track_ignore_git_repo() {
     fs::write(dir.path().join("poppy.yay"), "not ignored").unwrap();
 
     cmd(dir.path(), ["-u", "status"]).success().stdout(
-        "A  .\n\
+        "A  ./\n\
          A  poppy.yay\n",
     );
 }

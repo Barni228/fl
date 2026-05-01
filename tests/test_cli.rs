@@ -260,7 +260,7 @@ fn test_cli_status_shows_modification() {
     fs::write(dir.path().join("dir").join("file.txt"), "hello").unwrap();
     cmd(dir.path(), ["-u", "status"]).success().stdout(
         "\
-        A  dir\n\
+        A  dir/\n\
         A  dir/file.txt\n",
     );
 
@@ -292,7 +292,7 @@ fn test_cli_status_no_commits_yet() {
     fs::write(dir.path().join("file.txt"), "hello").unwrap();
     cmd(dir.path(), ["-u", "status"]).success().stdout(
         "\
-        A  .\n\
+        A  ./\n\
         A  file.txt\n",
     );
 }
@@ -326,7 +326,7 @@ fn test_cli_diff_between_commits() {
     cmd(dir.path(), ["diff", "0", "1"]).success().stdout(
         "\
         Diffing 0 and 1\n\
-        M  .\n\
+        M  ./\n\
         A  file.txt\n",
     );
 }
@@ -355,13 +355,13 @@ fn test_cli_diff_reversed_order_same_result() {
     cmd(dir.path(), ["diff", "0", "1"]).stdout(
         "\
         Diffing 0 and 1\n\
-        M  .\n\
+        M  ./\n\
         A  file.txt\n",
     );
     cmd(dir.path(), ["diff", "1", "0"]).stdout(
         "\
         Diffing 0 and 1\n\
-        M  .\n\
+        M  ./\n\
         A  file.txt\n",
     );
 }
@@ -588,7 +588,7 @@ Body:
     <no body>
 
 Changes:
-A  .
+A  ./
 ",
         ));
     }
@@ -949,7 +949,7 @@ fn test_cli_full_workflow() {
     // diff commit 0 -> 1 should show a modification
     cmd(dir.path(), ["diff", "0", "1"]).success().stdout(
         "Diffing 0 and 1\n\
-        M  .\n\
+        M  ./\n\
         M  a.txt\n",
     );
 
