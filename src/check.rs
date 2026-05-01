@@ -7,21 +7,25 @@ use thiserror::Error;
 #[derive(Debug, Error, Diagnostic)]
 pub enum CheckWarning {
     #[error("Not inside an fl repository (or any of the parent directories)")]
-    #[diagnostic(severity(Error))]
     #[diagnostic(help("Run `fl init` to create a new fl repository"))]
+    #[diagnostic(severity(Error))]
     RepoNotFound,
 
     #[error("Could not open the .fl directory")]
-    #[diagnostic(severity(Error))]
     #[diagnostic(help("Run `fl init` to create a new fl repository"))]
+    #[diagnostic(severity(Error))]
     FlNotFound(#[source] std::io::Error),
 
     #[error("Could not open the STAGE file")]
+    #[diagnostic(help("Run `fl update` to create valid STAGE file"))]
     #[diagnostic(severity(Warning))]
-    #[diagnostic(help("Run `fl update` to create STAGE file"))]
     StageNotFound(#[source] std::io::Error),
 
     #[error("Could not open the config file")]
+    #[diagnostic(help(
+        "You can create an empty config file there to fix this\n\
+         You can also run `fl config default` to see the default config"
+    ))]
     #[diagnostic(severity(Warning))]
     ConfigNotFound(#[source] std::io::Error),
 
@@ -38,10 +42,12 @@ pub enum CheckWarning {
     },
 
     #[error("Invalid stage file")]
+    #[diagnostic(help("Run `fl update` to create valid STAGE file"))]
     #[diagnostic(severity(Warning))]
     InvalidStage(#[source] commit::CommitError),
 
     #[error("Failed to parse config")]
+    #[diagnostic(help("Fix the syntax error in there, or just make it an empty file"))]
     #[diagnostic(severity(Warning))]
     InvalidConfig(#[from] conf::ConfigError),
 
@@ -54,11 +60,12 @@ pub enum CheckWarning {
     },
 
     #[error("Unrecognized {type}: `{0}`", type = if .0.is_dir() { "directory" } else { "file" })]
-    #[diagnostic(severity(Advice))]
     #[diagnostic(help("You can safely delete this"))]
+    #[diagnostic(severity(Advice))]
     UnrecognizedEntry(PathBuf),
 
     #[error("Error hashing {file}: {bad_hash} (full path: {full_path})")]
+    #[diagnostic(help("Maybe try checking the permissions of this file?"))]
     #[diagnostic(severity(Advice))]
     BadHash {
         file: PathBuf,
@@ -66,7 +73,10 @@ pub enum CheckWarning {
         full_path: PathBuf,
     },
 
-    #[error("Could not open the entry")]
+    #[error("Could not open an entry")]
+    #[diagnostic(help(
+        "This can happen if the filesystem changed during iteration. Maybe try again"
+    ))]
     #[diagnostic(severity(Advice))]
     BadEntry(#[source] std::io::Error),
 }
