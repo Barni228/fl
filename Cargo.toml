@@ -1,6 +1,6 @@
 [package]
 name = "fl"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 description = "A git-like way to track changes made to HUGE files, using hashes"
 repository = "https://github.com/Barni228/fl"
