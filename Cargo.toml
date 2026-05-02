@@ -1,14 +1,16 @@
 [package]
 name = "fl"
-description = "A git-like way to track changes made to HUGE files, using hashes"
 version = "0.1.0"
 edition = "2024"
+description = "A git-like way to track changes made to HUGE files, using hashes"
+repository = "https://github.com/Barni228/fl"
+license = "MIT"
 
 [dependencies]
 clap = { version = "4.6.0", features = ["cargo"] }
 colored = "3.1.1"
-conf = { version = "0.15.22", package = "config", default-features = false, features = [
-    "toml",
+conf = { package = "config", version = "0.15.22", default-features = false, features = [
+  "toml",
 ] }
 filelist = { git = "https://github.com/Barni228/filelist", version = "0.3.0" }
 fs-err = "3.3.0"
@@ -26,3 +28,8 @@ toml_edit = "0.25.10"
 assert_cmd = { version = "2.2.0", features = ["color"] }
 predicates = { version = "3.1.4", default-features = false }
 tempfile = "3.27.0"
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"
