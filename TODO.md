@@ -1,3 +1,8 @@
+## Changing some stuff?
+
+Make sure `README.md` is up to date
+If you change the repo structure, make sure to update `src/tests/test_repo.rs`, `tests/check.rs` and `src/check.rs`
+
 ## Features
 
 - [ ] maybe create a `fix` command that fixes invalid `.fl/` folder
@@ -11,6 +16,7 @@
 - [ ] Add a way to set every setting with --flags
 - [ ] Make `fl --log-max=10 config set` set `log.max = 10` (or `--max=10`)
 - [ ] `fl commit` Throw error or warning when commit has no changes
+- [ ] Document how to set up common editors in README
 
 ## Bugs / Improvements
 
