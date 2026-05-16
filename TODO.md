@@ -17,6 +17,9 @@ If you change the repo structure, make sure to update `src/tests/test_repo.rs`, 
 - [ ] Make `fl --log-max=10 config set` set `log.max = 10` (or `--max=10`)
 - [ ] `fl commit` Throw error or warning when commit has no changes
 - [ ] Document how to set up common editors in README
+- [ ] Allow generating partial hashes (for example, only hash first 4kb of every file, to speed up everything)
+- [ ] Allow only updating new files, so if a path was present in a previous commit, don't hash it
+      Instead hash only the newly appeared paths (significantly faster, but looses check for Modifications)
 
 ## Bugs / Improvements
 

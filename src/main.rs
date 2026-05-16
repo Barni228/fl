@@ -1,7 +1,6 @@
-use std::path::PathBuf;
-
 use clap::{Command, arg, command, value_parser};
 use fl::FL;
+use std::path::PathBuf;
 
 fn main() -> miette::Result<()> {
     let matches = get_clap_cmd().get_matches();
@@ -18,10 +17,25 @@ fn main() -> miette::Result<()> {
         Some(("init", _)) => {
             FL::init()?;
         }
-        Some(("update", _)) => {
+        Some(("update", sub)) => {
             let fl = get_fl()?;
-            println!("Updating {}", fl.root().display());
-            fl.update()?;
+            if let Some(paths) = sub.get_many::<PathBuf>("PATHS") {
+                let paths: Vec<_> = paths.collect();
+
+                println!(
+                    "Updating {}",
+                    paths
+                        .iter()
+                        .map(|p| p.display().to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                );
+
+                fl.update_paths(&paths)?;
+            } else {
+                println!("Updating {}", fl.root().display());
+                fl.update()?;
+            }
         }
         Some(("status", _)) => {
             let fl = get_fl()?;
@@ -138,7 +152,11 @@ fn get_clap_cmd() -> Command {
                 .alias("i"),
             Command::new("update")
                 .about("Update the repo, so all new changes are tracked")
-                .alias("u"),
+                .alias("u")
+                .args([
+                    arg!([PATHS]... "The paths to update, leave empty to update all")
+                        .value_parser(value_parser!(PathBuf)),
+                ]),
             Command::new("status")
                 .about("Print changes to files compared to last commit")
                 .alias("st"),

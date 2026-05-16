@@ -87,6 +87,46 @@ fn test_cli_update() {
     }
 }
 
+#[test]
+fn test_cli_update_2_paths() {
+    let dir = new_repo();
+
+    fs::write(dir.path().join("file1.txt"), "1").unwrap();
+    fs::write(dir.path().join("file2.txt"), "2").unwrap();
+    cmd(dir.path(), ["-u", "commit", "Add 2 files"]).success();
+
+    fs::write(dir.path().join("file1.txt"), "changed").unwrap();
+    fs::write(dir.path().join("file2.txt"), "change too").unwrap();
+    fs::write(dir.path().join("added"), "new").unwrap();
+    // Only update file1 and added
+    cmd(dir.path(), ["update", "file1.txt", "added"]).success();
+
+    cmd(dir.path(), ["status"]).success().stdout(
+        "\
+        A  added\n\
+        M  file1.txt\n",
+    );
+}
+#[test]
+fn test_cli_update_paths_delete() {
+    let dir = new_repo();
+
+    fs::write(dir.path().join("file1.txt"), "hello").unwrap();
+    fs::write(dir.path().join("file2.txt"), "hello").unwrap();
+    fs::write(dir.path().join("file3.txt"), "hello").unwrap();
+    cmd(dir.path(), ["-u", "commit", "Add 3 files"]).success();
+
+    // I remove 2 files, but update only 1
+    fs::remove_file(dir.path().join("file1.txt")).unwrap();
+    fs::remove_file(dir.path().join("file2.txt")).unwrap();
+    cmd(dir.path(), ["update", "file1.txt"]).success();
+
+    cmd(dir.path(), ["status"]).success().stdout(
+        "\
+        D  file1.txt\n",
+    );
+}
+
 // --- commit -------------------------------------------------------------------
 
 #[test]
@@ -659,6 +699,7 @@ Error:   × Unrecognized key `no_exist`, could not find a default value for it
 ",
         );
 }
+
 // --- config get ---------------------------------------------------------------
 
 #[test]

@@ -202,12 +202,31 @@ impl FL {
     /// to a new history file with the next commit index.
     pub fn update(&self) -> Result<()> {
         let mut fl = self.get_filelist();
-        let mut commit = commit::Commit::default();
+        let mut stage = commit::Commit::default();
         let output = self.stage_path();
 
-        commit.snapshot = fl.hash_paths(&[&self.root]);
+        stage.snapshot = fl.hash_paths(&[&self.root]);
 
-        commit.save_to(output)?;
+        stage.save_to(output)?;
+        Ok(())
+    }
+
+    pub fn update_paths<P: AsRef<Path>>(&self, paths: &[P]) -> Result<()> {
+        let mut fl = self.get_filelist();
+        let output = self.stage_path();
+        let mut stage = commit::Commit::load_from(&output)?;
+
+        // Only update the new paths
+        for (path, hash) in fl.hash_paths(paths) {
+            // TODO: when filelist returns `Result<_>`, have a better check for deleted files
+            if hash == "ERROR: No such file or directory (os error 2)" {
+                stage.snapshot.remove(&path);
+            } else {
+                stage.snapshot.insert(path, hash);
+            }
+        }
+
+        stage.save_to(output)?;
         Ok(())
     }
 
