@@ -16,13 +16,17 @@ That works great for source code, but becomes painful when you're working with l
 
 ## Installation
 
-### From a GitHub Release (recommended)
+### From a Release (recommended)
 
-Pre-built binaries are available for Linux, macOS, and Windows.
+Run this installation command:
 
-1. Go to the [Releases](https://github.com/Barni228/fl/releases) page
-2. Select the most recent version
-3. Copy the install command for your platform and run it in your terminal
+```bash
+curl --proto '=https' --tlsv1.2 -LsSf \
+https://github.com/Barni228/fl/releases/latest/download/fl-installer.sh | sh
+```
+
+Or checkout [Releases](https://github.com/Barni228/fl/releases) for
+pre-built binaries for Linux, macOS, and Windows.
 
 ### From Source
 
@@ -66,21 +70,24 @@ fl commit "initial snapshot"
 
 # make some changes
 # ...
-# See what changed (-u basically makes this)
+# See what changes were made
 fl update
 fl status
 
 # or run both of those commands together:
 fl -u status
 
+# you can also update only specific paths
+fl update some_file
+
 # Commit again
-fl commit "added new data files"
+fl commit "added new files"
 # or `fl -u commit "..."` if you need to update the snapshot
 
 # See the full history
 fl log
 
-# See what the most recent commit did
+# See what the most recent commit did (this is negative one, not `1` flag)
 fl show -1
 ```
 
