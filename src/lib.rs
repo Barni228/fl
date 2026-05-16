@@ -206,6 +206,7 @@ impl FL {
 
         let mut fl = self.get_filelist();
         let mut stage = commit::Commit::default();
+        stage.set_timestamp_now();
         let output = self.stage_path();
 
         stage.snapshot = fl.hash_paths(&[&self.root]);
@@ -221,6 +222,7 @@ impl FL {
         let mut stage = commit::Commit::load_from(&output)
             .or_else(|_| self.get_commit(-1))
             .unwrap_or_default();
+        stage.set_timestamp_now();
 
         // Unique parents from `paths` (could be files or dirs)
         let parents = self.unique_relative_parents(paths);
@@ -257,6 +259,7 @@ impl FL {
             .or_else(|_| self.get_commit(-1))
             .unwrap_or_default();
         let mut stage = commit::Commit::default();
+        stage.set_timestamp_now();
         let mut new_paths = Vec::new();
 
         for (path, _empty_hash) in fl.hash_paths(&[&self.root]) {
@@ -288,6 +291,7 @@ impl FL {
             .or_else(|_| self.get_commit(-1))
             .unwrap_or_default();
         let mut stage = old_stage.clone();
+        stage.set_timestamp_now();
         let mut new_paths = Vec::new();
 
         let parents = self.unique_relative_parents(paths);
@@ -320,6 +324,10 @@ impl FL {
         let stage = self.get_stage()?;
         let last_commit = self.get_commit_or_default(self.commits - 1)?;
         let actions = FL::diff_actions_commit(&last_commit, &stage);
+
+        if self.config.status.print_time_ago {
+            println!("Last updated: {}", stage.time_ago());
+        }
 
         // Don't print dir changes, because it will print the files that got changed anyway
         // This will make it feel more like `git status`

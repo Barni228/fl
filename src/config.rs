@@ -67,6 +67,7 @@ pub struct Config {
     pub rm_commit_file: bool,
     pub track: Track,
     pub editor: Editor,
+    pub status: Status,
     pub log: Log,
 
     #[serde(skip)]
@@ -94,6 +95,12 @@ impl Default for Track {
 pub struct Editor {
     pub command: Vec<String>,
     pub ask_confirm: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(default, deny_unknown_fields)]
+pub struct Status {
+    pub print_time_ago: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

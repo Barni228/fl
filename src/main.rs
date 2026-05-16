@@ -46,8 +46,9 @@ fn main() -> miette::Result<()> {
                 }
             }
         }
-        Some(("status", _)) => {
-            let fl = get_fl()?;
+        Some(("status", sub)) => {
+            let mut fl = get_fl()?;
+            fl.config.status.print_time_ago |= sub.get_flag("time");
             fl.status()?;
         }
         Some(("diff", sub)) => {
@@ -165,11 +166,13 @@ fn get_clap_cmd() -> Command {
                 .args([
                     arg!([PATHS]... "The paths to update, leave empty to update all")
                         .value_parser(value_parser!(PathBuf)),
-                    arg!(-n --"new-only" "Only hash newly created files (faster, but no modification detection)")
+                    arg!(-n --"new-only" "Only hash newly created files \
+                        (faster, but no modification detection)"),
                 ]),
             Command::new("status")
                 .about("Print changes to files compared to last commit")
-                .alias("st"),
+                .alias("st")
+                .args([arg!(-t --time "Print when the last update was")]),
             Command::new("diff")
                 .about("Print what has changed between 2 commits")
                 .alias("d")

@@ -361,6 +361,30 @@ fn test_config_track_ignore_git_repo() {
          A  poppy.yay\n",
     );
 }
+
+// status.print_time_ago
+
+#[test]
+fn test_config_status_time_ago_false() {
+    let dir = new_repo();
+    set_config(&dir, "status.print_time_ago = false");
+
+    cmd(dir.path(), ["-u", "status"])
+        .success()
+        .stdout("A  ./\n");
+}
+
+#[test]
+fn test_config_status_time_ago_true() {
+    let dir = new_repo();
+    set_config(&dir, "status.print_time_ago = true");
+
+    cmd(dir.path(), ["-u", "status"]).success().stdout(
+        "Last updated: just now\n\
+        A  ./\n",
+    );
+}
+
 // --- log.max ------------------------------------------------------------------
 
 #[test]

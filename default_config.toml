@@ -21,6 +21,10 @@ command = []
 # enable this if your editor exits before saving the file (e.g. VSCode by default)
 ask_confirm = false
 
+[status]
+# if true, will print when the stage was last updated
+print_time_ago = false
+
 # This configures the style of `log` command
 [log]
 # Maximum number of most recent commits to print, set to 0 to print all
