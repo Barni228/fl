@@ -107,6 +107,7 @@ fn test_cli_update_2_paths() {
         M  file1.txt\n",
     );
 }
+
 #[test]
 fn test_cli_update_paths_delete() {
     let dir = new_repo();
@@ -124,6 +125,128 @@ fn test_cli_update_paths_delete() {
     cmd(dir.path(), ["status"]).success().stdout(
         "\
         D  file1.txt\n",
+    );
+}
+
+#[test]
+fn test_cli_update_paths_dir() {
+    let dir = new_repo();
+
+    fs::create_dir(dir.path().join("dir")).unwrap();
+    fs::write(dir.path().join("dir").join("inside1"), "yo").unwrap();
+    fs::write(dir.path().join("dir").join("inside2"), "1615161625").unwrap();
+    cmd(dir.path(), ["-u", "commit", "-e"]).success();
+
+    // I remove 2 files, but update only 1
+    fs::remove_file(dir.path().join("dir").join("inside1")).unwrap();
+    fs::write(dir.path().join("dir").join("inside2"), "what?").unwrap();
+    cmd(dir.path(), ["update", "dir"]).success();
+
+    cmd(dir.path(), ["status"]).success().stdout(
+        "\
+        D  dir/inside1\n\
+        M  dir/inside2\n",
+    );
+}
+
+#[test]
+fn test_cli_update_paths_dot() {
+    let dir = new_repo();
+
+    fs::write(dir.path().join("file"), "first").unwrap();
+    cmd(dir.path(), ["-u", "commit", "-e"]).success();
+
+    fs::remove_file(dir.path().join("file")).unwrap();
+    fs::write(dir.path().join("file1"), "first-er").unwrap();
+    cmd(dir.path(), ["update", "."]).success();
+
+    cmd(dir.path(), ["status"]).success().stdout(
+        "\
+        D  file\n\
+        A  file1\n",
+    );
+}
+
+#[test]
+fn test_cli_update_new_only() {
+    let dir = new_repo();
+
+    fs::write(dir.path().join("file"), "first").unwrap();
+    fs::write(dir.path().join("file2"), "q").unwrap();
+    cmd(dir.path(), ["-u", "commit", "-e"]).success();
+
+    fs::remove_file(dir.path().join("file")).unwrap();
+    fs::write(dir.path().join("file2"), "w").unwrap();
+    fs::write(dir.path().join("added"), "new").unwrap();
+    cmd(dir.path(), ["update", "--new-only"]).success();
+
+    // Did not see the fact that file2 changed, because of `new-only`
+    cmd(dir.path(), ["status"]).success().stdout(
+        "\
+        A  added\n\
+        D  file\n",
+    );
+}
+
+#[test]
+fn test_cli_update_new_only_no_stage() {
+    let dir = new_repo();
+
+    fs::write(dir.path().join("file"), "first").unwrap();
+    fs::write(dir.path().join("file2"), "q").unwrap();
+    cmd(dir.path(), ["-u", "commit", "-e"]).success();
+
+    // Remove the STAGE file, this should use most recent commit instead
+    fs::remove_file(dir.path().join(".fl").join("STAGE.json")).unwrap();
+
+    fs::remove_file(dir.path().join("file")).unwrap();
+    fs::write(dir.path().join("file2"), "w").unwrap();
+    fs::write(dir.path().join("added"), "new").unwrap();
+    cmd(dir.path(), ["update", "--new-only"]).success();
+
+    // Did not see the fact that file2 changed, because of `new-only`
+    cmd(dir.path(), ["status"]).success().stdout(
+        "\
+        A  added\n\
+        D  file\n",
+    );
+}
+
+#[test]
+fn test_cli_update_new_only_no_commit() {
+    let dir = new_repo();
+
+    fs::write(dir.path().join("file"), "first").unwrap();
+    fs::write(dir.path().join("file2"), "q").unwrap();
+    cmd(dir.path(), ["update", "--new-only"]).success();
+
+    // Every file is new, so its same as `update`
+    cmd(dir.path(), ["status"]).success().stdout(
+        "\
+        A  ./\n\
+        A  file\n\
+        A  file2\n",
+    );
+}
+
+#[test]
+fn test_cli_update_new_only_and_paths() {
+    let dir = new_repo();
+
+    fs::write(dir.path().join("file"), "first").unwrap();
+    fs::write(dir.path().join("file2"), "q").unwrap();
+    cmd(dir.path(), ["-u", "commit", "-e"]).success();
+
+    fs::remove_file(dir.path().join("file")).unwrap();
+    fs::write(dir.path().join("file2"), "w").unwrap();
+    fs::write(dir.path().join("added"), "new").unwrap();
+    cmd(dir.path(), ["update", "--new-only", "."]).success();
+
+    // Did not see the fact that file2 changed, because of `new-only`
+    cmd(dir.path(), ["status"]).success().stdout(
+        "\
+        A  added\n\
+        D  file\n",
     );
 }
 

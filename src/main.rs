@@ -19,6 +19,7 @@ fn main() -> miette::Result<()> {
         }
         Some(("update", sub)) => {
             let fl = get_fl()?;
+            let new_only = sub.get_flag("new-only");
             if let Some(paths) = sub.get_many::<PathBuf>("PATHS") {
                 let paths: Vec<_> = paths.collect();
 
@@ -31,10 +32,18 @@ fn main() -> miette::Result<()> {
                         .join(", ")
                 );
 
-                fl.update_paths(&paths)?;
+                if new_only {
+                    fl.update_paths_new_only(&paths)?;
+                } else {
+                    fl.update_paths(&paths)?;
+                }
             } else {
                 println!("Updating {}", fl.root().display());
-                fl.update()?;
+                if new_only {
+                    fl.update_new_only()?;
+                } else {
+                    fl.update()?;
+                }
             }
         }
         Some(("status", _)) => {
@@ -156,6 +165,7 @@ fn get_clap_cmd() -> Command {
                 .args([
                     arg!([PATHS]... "The paths to update, leave empty to update all")
                         .value_parser(value_parser!(PathBuf)),
+                    arg!(-n --"new-only" "Only hash newly created files (faster, but no modification detection)")
                 ]),
             Command::new("status")
                 .about("Print changes to files compared to last commit")

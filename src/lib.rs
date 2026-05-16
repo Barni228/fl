@@ -201,6 +201,9 @@ impl FL {
     /// This generates a file list for the root directory and writes it
     /// to a new history file with the next commit index.
     pub fn update(&self) -> Result<()> {
+        // This will work, but it does extra checks:
+        // self.update_paths(&[&self.root])
+
         let mut fl = self.get_filelist();
         let mut stage = commit::Commit::default();
         let output = self.stage_path();
@@ -214,16 +217,98 @@ impl FL {
     pub fn update_paths<P: AsRef<Path>>(&self, paths: &[P]) -> Result<()> {
         let mut fl = self.get_filelist();
         let output = self.stage_path();
-        let mut stage = commit::Commit::load_from(&output)?;
+        // get the stage, if it does not exist get most recent commit, if that fails get empty commit
+        let mut stage = commit::Commit::load_from(&output)
+            .or_else(|_| self.get_commit(-1))
+            .unwrap_or_default();
+
+        // Unique parents from `paths` (could be files or dirs)
+        let parents = self.unique_relative_parents(paths);
+
+        // remove everything that is in `paths`, because it will be added right now
+        // If paths is `self.root` (or `.`), this will remove everything from stage
+        stage
+            .snapshot
+            .retain(|path, _| parents.iter().all(|p| !path.starts_with(p)));
 
         // Only update the new paths
         for (path, hash) in fl.hash_paths(paths) {
             // TODO: when filelist returns `Result<_>`, have a better check for deleted files
-            if hash == "ERROR: No such file or directory (os error 2)" {
-                stage.snapshot.remove(&path);
-            } else {
+            if hash != "ERROR: No such file or directory (os error 2)" {
                 stage.snapshot.insert(path, hash);
             }
+        }
+
+        stage.save_to(output)?;
+        Ok(())
+    }
+
+    pub fn update_new_only(&self) -> Result<()> {
+        // This would work:
+        // self.update_paths_new_only(&[&self.root])
+
+        let mut fl = self.get_filelist();
+        fl.hasher_mut().set_no_hash(true);
+
+        // Make new `stage`, but reuse hashes from old_stage instead of hashing again
+        let output = self.stage_path();
+        // get the stage, if it does not exist get most recent commit, if that fails get empty commit
+        let old_stage = commit::Commit::load_from(&output)
+            .or_else(|_| self.get_commit(-1))
+            .unwrap_or_default();
+        let mut stage = commit::Commit::default();
+        let mut new_paths = Vec::new();
+
+        for (path, _empty_hash) in fl.hash_paths(&[&self.root]) {
+            assert_eq!(_empty_hash, "");
+            if let Some(hash) = old_stage.snapshot.get(&path) {
+                stage.snapshot.insert(path, hash.clone());
+            } else {
+                new_paths.push(path);
+            }
+        }
+
+        fl.hasher_mut().set_no_hash(false);
+        // New files
+        for (path, hash) in fl.hash_paths(&new_paths) {
+            stage.snapshot.insert(path, hash);
+        }
+
+        stage.save_to(output)?;
+        Ok(())
+    }
+
+    pub fn update_paths_new_only<P: AsRef<Path>>(&self, paths: &[P]) -> Result<()> {
+        let mut fl = self.get_filelist();
+        fl.hasher_mut().set_no_hash(true);
+
+        // Make new `stage`, but reuse hashes from old_stage instead of hashing again
+        let output = self.stage_path();
+        let old_stage = commit::Commit::load_from(&output)
+            .or_else(|_| self.get_commit(-1))
+            .unwrap_or_default();
+        let mut stage = old_stage.clone();
+        let mut new_paths = Vec::new();
+
+        let parents = self.unique_relative_parents(paths);
+        // remove everything that is in `paths`, because it will be added right now
+        stage
+            .snapshot
+            .retain(|path, _| parents.iter().all(|p| !path.starts_with(p)));
+
+        for (path, _empty_hash) in fl.hash_paths(paths) {
+            assert_eq!(_empty_hash, "");
+            if let Some(hash) = old_stage.snapshot.get(&path) {
+                stage.snapshot.insert(path, hash.clone());
+            } else {
+                new_paths.push(path);
+            }
+        }
+
+        fl.hasher_mut().set_no_hash(false);
+        // New files
+        for (path, hash) in fl.hash_paths(&new_paths) {
+            stage.snapshot.insert(path, hash);
         }
 
         stage.save_to(output)?;
@@ -821,6 +906,31 @@ impl FL {
                 max: self.commits - 1,
             }),
         }
+    }
+
+    fn unique_relative_parents<P: AsRef<Path>>(&self, paths: &[P]) -> Vec<PathBuf> {
+        let mut parents: Vec<PathBuf> = Vec::new();
+        for path in paths {
+            // Make path relative to `self.root`
+            let abs = path
+                .as_ref()
+                .canonicalize()
+                .unwrap_or_else(|_| self.root.join(path));
+
+            let Ok(rel) = abs.strip_prefix(&self.root) else {
+                // Path not in root => just ignore it
+                continue;
+            };
+
+            // Skip if already covered by existing parent
+            if parents.iter().any(|p| rel.starts_with(p)) {
+                continue;
+            }
+            // Remove any children of this new parent
+            parents.retain(|p| !p.starts_with(rel));
+            parents.push(rel.to_path_buf());
+        }
+        parents
     }
 
     /// returns a pre-configured filelist for this repo

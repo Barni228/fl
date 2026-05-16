@@ -437,8 +437,8 @@ checksum = "9f1f227452a390804cdb637b74a86990f2a7d7ba4b7d5693aac9b4dd6defd8d6"
 
 [[package]]
 name = "filelist"
-version = "0.3.0"
-source = "git+https://github.com/Barni228/filelist#a831662d60ed2a412fd144169386790f5f124093"
+version = "0.3.1"
+source = "git+https://github.com/Barni228/filelist#5e506060548846344b5e34167efd0dc484cb9027"
 dependencies = [
  "clap",
  "crossterm",

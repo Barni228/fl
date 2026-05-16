@@ -18,8 +18,6 @@ If you change the repo structure, make sure to update `src/tests/test_repo.rs`, 
 - [ ] `fl commit` Throw error or warning when commit has no changes
 - [ ] Document how to set up common editors in README
 - [ ] Allow generating partial hashes (for example, only hash first 4kb of every file, to speed up everything)
-- [ ] Allow only updating new files, so if a path was present in a previous commit, don't hash it
-      Instead hash only the newly appeared paths (significantly faster, but looses check for Modifications)
 
 ## Bugs / Improvements
 
@@ -30,11 +28,13 @@ If you change the repo structure, make sure to update `src/tests/test_repo.rs`, 
 - [ ] When counting how many changes a commit made, dont do nice rename detection (should make things faster)
 - [ ] Improve how I edit toml (maybe create a new project that expands on `toml_edit`)
 - [ ] Now that Config has a private `use_global`, use that in the getters and setters
-- [ ] Make `check` `BadHash` actually have the error, not string like "ERROR: permission denied"
+- [ ] Make `check` in `BadHash` actually have the error, not string like "ERROR: permission denied"
 - [ ] `check` add help messages to every error
 
 ## Done
 
+- [x] Allow only updating new files, so if a path was present in a previous commit, don't hash it
+      Instead hash only the newly appeared paths (significantly faster, but looses check for Modifications)
 - [x] When printing paths, add trailing `/` to directories (diff, status)
 - [x] Add a way to ignore files/folders, like `.gitignore`
 - [x] Add something like `check`, that checks if everything is alright

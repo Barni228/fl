@@ -12,7 +12,7 @@ colored = "3.1.1"
 conf = { package = "config", version = "0.15.22", default-features = false, features = [
   "toml",
 ] }
-filelist = { git = "https://github.com/Barni228/filelist", version = "0.3.0" }
+filelist = { git = "https://github.com/Barni228/filelist", version = "0.3.1" }
 fs-err = "3.3.0"
 miette = { version = "7.6.0", features = ["fancy"] }
 pathfinding = "4.15.0"
