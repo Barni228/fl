@@ -1013,6 +1013,24 @@ Error:   × Config error
         );
 }
 
+#[test]
+fn test_cli_config_set_editor_command() {
+    let dir = new_repo();
+
+    fs::write(
+        dir.path().join(".fl").join("config.toml"),
+        config::DEFAULT_CONFIG,
+    )
+    .unwrap();
+
+    cmd(dir.path(), ["config", "set", "editor.command", "code -w"]).success();
+
+    assert_eq!(
+        config::DEFAULT_CONFIG.replace("command = []", "command = [\"code\", \"-w\"]"),
+        fs::read_to_string(dir.path().join(".fl").join("config.toml")).unwrap()
+    );
+}
+
 // --- config unset -------------------------------------------------------------
 
 #[test]

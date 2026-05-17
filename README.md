@@ -93,6 +93,36 @@ fl show -1
 
 ---
 
+## Configuration
+
+fl looks for config in two places, merged in order:
+
+1. **Local**: `.fl/config.toml` in the repo root (takes precedence)
+2. **Global**: `~/.config/fl/config.toml` (or path in `$FL_GLOBAL_CONFIG`)
+
+Run `fl config default` to see all available options with their defaults,
+or read the [Default Config](default_config.toml)
+
+### Set up Editor
+
+To set up your editor, set `editor.command` in `config.toml`:
+Example:
+
+```toml
+[editor]
+command = ["code" "-w"]
+```
+
+or with command:
+
+```bash
+fl config set editor.command "code -w"
+```
+
+When setting `editor.command`, it will split the string on spaces
+
+---
+
 ### Ignore
 
 By default, `fl` will respect `.ignore` files (same as `.gitignore`, just not git specific)
@@ -109,6 +139,8 @@ ignore_git = true
 ```
 
 In `.fl/config.toml` (open with `fl config open`)
+
+---
 
 ## Commands
 
@@ -183,18 +215,6 @@ Rename detection is automatic. If a file is deleted and another file with the sa
 R  "old_name.txt" -> "new_name.txt"
 R  "src/widget.rs" -> "lib/widget.rs"
 ```
-
----
-
-## Configuration
-
-fl looks for config in two places, merged in order:
-
-1. **Local**: `.fl/config.toml` in the repo root (takes precedence)
-2. **Global**: `~/.config/fl/config.toml` (or path in `$FL_GLOBAL_CONFIG`)
-
-Run `fl config default` to see all available options with their defaults,
-or read the [Default Config](default_config.toml)
 
 ---
 

@@ -10,7 +10,6 @@ If you change the repo structure, make sure to update `src/tests/test_repo.rs`, 
 - [ ] Add a way to edit commit history
 - [ ] Add a way to filter commits, like `-ad` for only add or delete actions
 - [ ] Make `config reset` work even if the current config file is broken
-- [ ] Make `config set editor.command "code -w"` work (`command = ["code", "-w"]`)
 - [ ] Add `config --global set ...` which will set things on global config file (`~/.config/fl/config.toml`)
 - [ ] Add a way to disable global config in local config (like `use_global_config = false`)
 - [ ] Add a way to set every setting with --flags
@@ -33,6 +32,7 @@ If you change the repo structure, make sure to update `src/tests/test_repo.rs`, 
 
 ## Done
 
+- [x] Make `config set editor.command "code -w"` work (`command = ["code", "-w"]`)
 - [x] Allow only updating new files, so if a path was present in a previous commit, don't hash it
       Instead hash only the newly appeared paths (significantly faster, but looses check for Modifications)
 - [x] When printing paths, add trailing `/` to directories (diff, status)

@@ -202,7 +202,11 @@ impl Config {
         value: &str,
     ) -> Result<(), ConfigError> {
         // parse value as toml value (like string or bool), and if that fails treat it as a string
-        let val = value.parse().unwrap_or_else(|_| toml_edit::value(value));
+        let val = match key {
+            // editor.command has a special setter
+            "editor.command" => toml_edit::Array::from_iter(value.split_whitespace()).into(),
+            _ => value.parse().unwrap_or_else(|_| toml_edit::value(value)),
+        };
 
         self.set_key_value(config_path, key, val)
     }
